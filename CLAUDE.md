@@ -24,16 +24,16 @@ More sub-apps are expected to follow, sharing the same accounts/auth/household s
 The backend and frontend are decoupled: Django + DRF expose a JSON API; the React SPA
 is a separate app (its own dev server and build) that talks to the API over HTTP.
 
-Planned repo layout:
+Repo layout:
 
 ```
-backend/            Django project
-  config/            settings, urls, wsgi/asgi
-  accounts/          users, households, Google OAuth
-  mealplanner/        first sub-app: recipes, weekly plan, shopping list
-frontend/            React SPA (Vite)
+backend/             Django project
+  config/              settings, urls, wsgi/asgi
+  accounts/            User (email-based), Household, Membership, Google OAuth login view
+  mealplanner/         first sub-app: recipes, weekly plan, shopping list
+frontend/            React SPA (Vite + TypeScript + Tailwind v4)
 docker-compose.yml   postgres + backend + frontend for local dev
-deploy/              Helm chart(s) for k3s, synced by ArgoCD
+deploy/              Helm chart(s) for k3s, synced by ArgoCD (not yet created)
 ```
 
 ## Deployment
@@ -73,5 +73,55 @@ same pattern as `mealplanner`.
 
 ## Conventions
 
-No code exists yet — this file will be updated with real commands (test, lint, run)
-once the Django and React projects are scaffolded.
+### Running locally
+
+```
+docker compose up --build
+```
+
+- Backend: http://localhost:8000 (health check at `/api/health/`, admin at `/admin/`)
+- Frontend: http://localhost:5173
+- Postgres: localhost:5432 (db/user/password: `getsorted`)
+
+First run needs migrations and a superuser, inside the running backend container:
+
+```
+docker compose exec backend python manage.py migrate
+docker compose exec backend python manage.py createsuperuser
+```
+
+Google OAuth login won't work until real credentials are set — copy `.env.example`
+to `.env` at the repo root and fill in `GOOGLE_OAUTH_CLIENT_ID` /
+`GOOGLE_OAUTH_CLIENT_SECRET` (from a Google Cloud OAuth client). Without them,
+everything else (admin, email/password auth, meal planner API) still works.
+
+### Without Docker
+
+Node and Docker were not available in the environment this skeleton was built in,
+so the frontend has not been `npm install`ed or run yet — do that first:
+
+```
+cd frontend && npm install && npm run dev
+```
+
+The backend was verified directly with the `py` launcher (venv + `pip install -r
+requirements.txt` + `manage.py migrate`/`runserver`), reusing the same `DATABASE_URL`
+override trick (e.g. `sqlite:///db.sqlite3`) if you don't want Postgres running
+locally outside Docker.
+
+### API auth model
+
+DRF is configured for JWT (via `dj-rest-auth` + `djangorestframework-simplejwt`),
+delivered as httpOnly cookies (`getsorted-access-token` / `getsorted-refresh-token`),
+plus session auth for the browsable API/admin. Google login flow: frontend obtains a
+Google access token client-side, POSTs it to `/api/auth/google/`, which verifies it via
+allauth and returns the JWT cookies. Email/password auth (registration, password
+reset) is available at `/api/auth/*` courtesy of dj-rest-auth, mainly for
+admin/testing convenience — Google is the primary intended login method.
+
+### Adding a new sub-app
+
+Follow the `mealplanner` app as the template: models scoped to `Household` (FK or via
+the household of a parent object), a `HouseholdScopedViewSet`-style base that filters
+querysets to the requesting user's households, and a router wired into
+`config/urls.py` under `/api/<subapp>/`.
