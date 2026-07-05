@@ -20,7 +20,7 @@ function App() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-semibold text-slate-800">getsorted</h1>
+        <h1 className="text-3xl font-semibold text-slate-800">GetSorted</h1>
         <p className="text-slate-500">
           Backend API:{' '}
           {status === 'checking' && 'checking…'}
