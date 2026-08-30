@@ -115,3 +115,29 @@ export async function createHousehold(name: string): Promise<Household> {
   })
   return response.json()
 }
+
+export interface Membership {
+  user_id: string
+  email: string
+  role: 'admin' | 'member'
+  joined_at: string
+}
+
+export async function fetchMembers(householdId: string): Promise<Membership[]> {
+  const response = await apiFetch(`/api/accounts/households/${householdId}/members/`)
+  return response.json()
+}
+
+export async function addMember(householdId: string, email: string): Promise<Membership> {
+  const response = await apiFetch(`/api/accounts/households/${householdId}/members/`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+  return response.json()
+}
+
+export async function removeMember(householdId: string, userId: string): Promise<void> {
+  await apiFetch(`/api/accounts/households/${householdId}/members/${userId}/`, {
+    method: 'DELETE',
+  })
+}

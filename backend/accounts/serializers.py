@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Household, Membership
+from .models import Household, Membership, User
 
 
 class HouseholdSerializer(serializers.ModelSerializer):
@@ -25,3 +25,23 @@ class HouseholdSerializer(serializers.ModelSerializer):
             role=Membership.Role.ADMIN,
         )
         return household
+
+
+class MembershipSerializer(serializers.ModelSerializer):
+    user_id = serializers.UUIDField(source="user.id", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+
+    class Meta:
+        model = Membership
+        fields = ["user_id", "email", "role", "joined_at"]
+
+
+class AddMemberSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, email: str) -> str:
+        if not User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError(
+                "No account with that email address. They need to sign up first."
+            )
+        return email

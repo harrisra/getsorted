@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useHouseholds } from './HouseholdsContext'
 import { CreateHouseholdForm } from './CreateHouseholdForm'
+import { HouseholdMembers } from './HouseholdMembers'
 
 export function HouseholdPage() {
   const { households } = useHouseholds()
@@ -10,14 +11,17 @@ export function HouseholdPage() {
     <div className="mx-auto max-w-2xl space-y-6 p-8">
       <h1 className="text-xl font-semibold text-slate-800">Your households</h1>
 
-      <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="space-y-4">
         {households.map((household) => (
-          <li key={household.id} className="flex items-center justify-between px-4 py-3">
-            <span className="font-medium text-slate-800">{household.name}</span>
-            <span className="text-sm capitalize text-slate-500">{household.role}</span>
-          </li>
+          <div key={household.id} className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="font-medium text-slate-800">{household.name}</span>
+              <span className="text-sm capitalize text-slate-500">{household.role}</span>
+            </div>
+            <HouseholdMembers household={household} />
+          </div>
         ))}
-      </ul>
+      </div>
 
       {showCreateForm ? (
         <div className="rounded-lg border border-slate-200 bg-white p-4">
