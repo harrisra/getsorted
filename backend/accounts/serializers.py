@@ -8,7 +8,7 @@ class HouseholdSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Household
-        fields = ["id", "name", "created_at", "role"]
+        fields = ["id", "name", "week_start_day", "created_at", "role"]
         read_only_fields = ["created_at", "role"]
 
     def get_role(self, obj: Household) -> str | None:

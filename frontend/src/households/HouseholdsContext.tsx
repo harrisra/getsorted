@@ -14,6 +14,7 @@ interface HouseholdsContextValue {
   currentHousehold: Household | null
   setCurrentHouseholdId: (id: string) => void
   createHousehold: (name: string) => Promise<Household>
+  refreshHouseholds: () => Promise<Household[]>
 }
 
 const HouseholdsContext = createContext<HouseholdsContextValue | null>(null)
@@ -66,7 +67,14 @@ export function HouseholdsProvider({ children }: { children: ReactNode }) {
 
   return (
     <HouseholdsContext.Provider
-      value={{ households, loading, currentHousehold, setCurrentHouseholdId, createHousehold }}
+      value={{
+        households,
+        loading,
+        currentHousehold,
+        setCurrentHouseholdId,
+        createHousehold,
+        refreshHouseholds: refresh,
+      }}
     >
       {children}
     </HouseholdsContext.Provider>

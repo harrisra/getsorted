@@ -40,19 +40,8 @@ class RecipeSerializer(serializers.ModelSerializer):
         read_only_fields = ["created_by", "created_at"]
 
     def get_current_cost(self, recipe):
-        """Sum of the current catalog price of each linked, priced ingredient.
-
-        Not a stored value — recalculated from live GroceryItem prices on every
-        read, and only covers ingredients that are linked to a catalog item
-        with a price set. Returns None (rather than 0) when nothing is priced,
-        so "no data" isn't confused with "free".
-        """
-        prices = [
-            ingredient.grocery_item.price
-            for ingredient in recipe.ingredients.all()
-            if ingredient.grocery_item_id and ingredient.grocery_item.price is not None
-        ]
-        return str(sum(prices)) if prices else None
+        cost = recipe.current_cost
+        return str(cost) if cost is not None else None
 
     def create(self, validated_data):
         ingredients_data = validated_data.pop("ingredients", [])
@@ -74,19 +63,74 @@ class RecipeSerializer(serializers.ModelSerializer):
         )
 
 
+class RecipeSummarySerializer(serializers.ModelSerializer):
+    current_cost = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Recipe
+        fields = ["id", "name", "meal_type", "servings", "current_cost"]
+
+    def get_current_cost(self, recipe):
+        cost = recipe.current_cost
+        return str(cost) if cost is not None else None
+
+
 class MealSlotSerializer(serializers.ModelSerializer):
+    recipes_detail = RecipeSummarySerializer(source="recipes", many=True, read_only=True)
+
     class Meta:
         model = MealSlot
-        fields = ["id", "meal_plan", "date", "meal_type", "recipe", "notes"]
+        fields = ["id", "meal_plan", "date", "meal_type", "recipes", "recipes_detail", "notes"]
+
+    def validate(self, attrs):
+        recipes = attrs.get("recipes")
+        if recipes:
+            meal_plan = attrs.get("meal_plan") or (self.instance and self.instance.meal_plan)
+            household_id = meal_plan.household_id if meal_plan else None
+            mismatched = [r for r in recipes if r.household_id != household_id]
+            if mismatched:
+                raise serializers.ValidationError(
+                    {"recipes": "Recipes must belong to the same household as this meal plan."}
+                )
+        return attrs
 
 
 class MealPlanSerializer(serializers.ModelSerializer):
     slots = MealSlotSerializer(many=True, read_only=True)
+    total_cost = serializers.SerializerMethodField()
+    daily_totals = serializers.SerializerMethodField()
 
     class Meta:
         model = MealPlan
-        fields = ["id", "household", "week_start", "created_at", "slots"]
+        fields = [
+            "id",
+            "household",
+            "week_start",
+            "created_at",
+            "slots",
+            "total_cost",
+            "daily_totals",
+        ]
         read_only_fields = ["created_at"]
+
+    def _costs_by_date(self, meal_plan):
+        costs_by_date: dict = {}
+        for slot in meal_plan.slots.all():
+            costs_by_date.setdefault(slot.date, [])
+            for recipe in slot.recipes.all():
+                if recipe.current_cost is not None:
+                    costs_by_date[slot.date].append(recipe.current_cost)
+        return costs_by_date
+
+    def get_daily_totals(self, meal_plan):
+        return [
+            {"date": date.isoformat(), "total_cost": str(sum(costs)) if costs else None}
+            for date, costs in sorted(self._costs_by_date(meal_plan).items())
+        ]
+
+    def get_total_cost(self, meal_plan):
+        all_costs = [cost for costs in self._costs_by_date(meal_plan).values() for cost in costs]
+        return str(sum(all_costs)) if all_costs else None
 
 
 class ShoppingListItemSerializer(serializers.ModelSerializer):

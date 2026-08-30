@@ -26,6 +26,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 
+class Weekday(models.IntegerChoices):
+    MONDAY = 0, "Monday"
+    TUESDAY = 1, "Tuesday"
+    WEDNESDAY = 2, "Wednesday"
+    THURSDAY = 3, "Thursday"
+    FRIDAY = 4, "Friday"
+    SATURDAY = 5, "Saturday"
+    SUNDAY = 6, "Sunday"
+
+
 class Household(models.Model):
     """A family/group whose members share meal plans, shopping lists, etc.
 
@@ -35,6 +45,11 @@ class Household(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
+    week_start_day = models.IntegerField(
+        choices=Weekday.choices,
+        default=Weekday.MONDAY,
+        help_text="Which day the meal planner's weekly view starts on.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     members = models.ManyToManyField(
         User, through="Membership", related_name="households"

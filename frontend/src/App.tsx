@@ -7,6 +7,7 @@ import { GroceryItemsPage } from './groceries/GroceryItemsPage'
 import { CreateHouseholdPage } from './households/CreateHouseholdPage'
 import { HouseholdPage } from './households/HouseholdPage'
 import { HouseholdsProvider, useHouseholds } from './households/HouseholdsContext'
+import { MealPlannerPage } from './mealplanner/MealPlannerPage'
 import { Navigation, type NavTab } from './nav/Navigation'
 import { RecipesPage } from './recipes/RecipesPage'
 
@@ -39,6 +40,7 @@ function Dashboard() {
       {activeTab === 'household' && <HouseholdPage />}
       {activeTab === 'groceries' && <GroceryItemsPage />}
       {activeTab === 'recipes' && <RecipesPage />}
+      {activeTab === 'mealplanner' && <MealPlannerPage />}
       <p className="mx-auto max-w-2xl px-8 pb-4 text-xs text-slate-400">
         Backend API:{' '}
         {status === 'checking' && 'checking…'}

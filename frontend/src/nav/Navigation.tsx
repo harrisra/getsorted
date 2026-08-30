@@ -1,13 +1,14 @@
 import { useAuth } from '../auth/AuthContext'
 import { useHouseholds } from '../households/HouseholdsContext'
 
-export type NavTab = 'account' | 'household' | 'groceries' | 'recipes'
+export type NavTab = 'account' | 'household' | 'groceries' | 'recipes' | 'mealplanner'
 
 const TABS: { id: NavTab; label: string }[] = [
   { id: 'account', label: 'Account' },
   { id: 'household', label: 'Household' },
   { id: 'groceries', label: 'Groceries' },
   { id: 'recipes', label: 'Recipes' },
+  { id: 'mealplanner', label: 'Meal Planner' },
 ]
 
 export function Navigation({

@@ -21,6 +21,7 @@ class HouseholdViewSet(
     mixins.ListModelMixin,
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
     """List/create households for the current user; creator becomes its admin."""
@@ -30,6 +31,10 @@ class HouseholdViewSet(
 
     def get_queryset(self):
         return Household.objects.filter(members=self.request.user).order_by("name")
+
+    def perform_update(self, serializer):
+        self._require_admin(serializer.instance)
+        serializer.save()
 
     def _require_admin(self, household: Household) -> None:
         is_admin = Membership.objects.filter(

@@ -1,7 +1,57 @@
 import { useState } from 'react'
+import { type Household, updateHouseholdWeekStartDay } from '../api/client'
 import { useHouseholds } from './HouseholdsContext'
 import { CreateHouseholdForm } from './CreateHouseholdForm'
 import { HouseholdMembers } from './HouseholdMembers'
+
+const WEEKDAYS = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+]
+
+function WeekStartSetting({ household }: { household: Household }) {
+  const { refreshHouseholds } = useHouseholds()
+  const [saving, setSaving] = useState(false)
+
+  if (household.role !== 'admin') {
+    return (
+      <p className="text-xs text-slate-400">
+        Meal planner week starts on {WEEKDAYS[household.week_start_day]}.
+      </p>
+    )
+  }
+
+  return (
+    <label className="flex items-center gap-2 text-xs text-slate-500">
+      <span>Meal planner week starts on</span>
+      <select
+        value={household.week_start_day}
+        disabled={saving}
+        onChange={async (e) => {
+          setSaving(true)
+          try {
+            await updateHouseholdWeekStartDay(household.id, Number(e.target.value))
+            await refreshHouseholds()
+          } finally {
+            setSaving(false)
+          }
+        }}
+        className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-slate-500 focus:outline-none"
+      >
+        {WEEKDAYS.map((day, index) => (
+          <option key={day} value={index}>
+            {day}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
 
 export function HouseholdPage() {
   const { households } = useHouseholds()
@@ -19,6 +69,9 @@ export function HouseholdPage() {
               <span className="text-sm capitalize text-slate-500">{household.role}</span>
             </div>
             <HouseholdMembers household={household} />
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <WeekStartSetting household={household} />
+            </div>
           </div>
         ))}
       </div>

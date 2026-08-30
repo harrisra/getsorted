@@ -29,6 +29,21 @@ class Recipe(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def current_cost(self):
+        """Sum of the current catalog price of each linked, priced ingredient.
+
+        None (rather than 0) when nothing is priced, so "no data" isn't
+        confused with "free". Shared by RecipeSerializer and MealPlan's
+        day/week cost totals so the calculation lives in exactly one place.
+        """
+        prices = [
+            ingredient.grocery_item.price
+            for ingredient in self.ingredients.all()
+            if ingredient.grocery_item_id and ingredient.grocery_item.price is not None
+        ]
+        return sum(prices) if prices else None
+
 
 class RecipeIngredient(models.Model):
     """One ingredient line within a Recipe, optionally linked to a catalog GroceryItem."""
@@ -54,11 +69,15 @@ class RecipeIngredient(models.Model):
 
 
 class MealPlan(models.Model):
-    """A single household's meal plan for one week."""
+    """A single household's meal plan for one week.
+
+    week_start is the date of the household's configured week_start_day
+    (see accounts.Household) for the week being planned.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     household = models.ForeignKey(Household, on_delete=models.CASCADE, related_name="meal_plans")
-    week_start = models.DateField(help_text="Monday of the planned week")
+    week_start = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -70,13 +89,17 @@ class MealPlan(models.Model):
 
 
 class MealSlot(models.Model):
-    """A single meal (e.g. Tuesday dinner) within a MealPlan."""
+    """A single cell (e.g. Tuesday dinner) within a MealPlan.
+
+    Holds zero or more recipes — a cell can be left empty, or have multiple
+    recipes selected for it.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     meal_plan = models.ForeignKey(MealPlan, on_delete=models.CASCADE, related_name="slots")
     date = models.DateField()
     meal_type = models.CharField(max_length=20, choices=MealType.choices)
-    recipe = models.ForeignKey(Recipe, on_delete=models.SET_NULL, null=True, blank=True)
+    recipes = models.ManyToManyField(Recipe, blank=True, related_name="meal_slots")
     notes = models.CharField(max_length=255, blank=True)
 
     class Meta:

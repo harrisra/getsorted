@@ -99,6 +99,7 @@ export async function fetchCurrentUser(): Promise<CurrentUser | null> {
 export interface Household {
   id: string
   name: string
+  week_start_day: number
   created_at: string
   role: 'admin' | 'member'
 }
@@ -112,6 +113,17 @@ export async function createHousehold(name: string): Promise<Household> {
   const response = await apiFetch('/api/accounts/households/', {
     method: 'POST',
     body: JSON.stringify({ name }),
+  })
+  return response.json()
+}
+
+export async function updateHouseholdWeekStartDay(
+  householdId: string,
+  weekStartDay: number,
+): Promise<Household> {
+  const response = await apiFetch(`/api/accounts/households/${householdId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ week_start_day: weekStartDay }),
   })
   return response.json()
 }
@@ -274,4 +286,58 @@ export async function updateRecipe(id: string, recipe: RecipeInput): Promise<Rec
 
 export async function deleteRecipe(id: string): Promise<void> {
   await apiFetch(`/api/mealplanner/recipes/${id}/`, { method: 'DELETE' })
+}
+
+export interface RecipeSummary {
+  id: string
+  name: string
+  meal_type: MealType
+  servings: number
+  current_cost: string | null
+}
+
+export interface MealSlot {
+  id: string
+  meal_plan: string
+  date: string
+  meal_type: MealType
+  recipes: string[]
+  recipes_detail: RecipeSummary[]
+  notes: string
+}
+
+export interface DailyTotal {
+  date: string
+  total_cost: string | null
+}
+
+export interface MealPlan {
+  id: string
+  household: string
+  week_start: string
+  created_at: string
+  slots: MealSlot[]
+  total_cost: string | null
+  daily_totals: DailyTotal[]
+}
+
+export async function fetchMealPlanForWeek(
+  householdId: string,
+  weekStart: string,
+): Promise<MealPlan> {
+  const response = await apiFetch(
+    `/api/mealplanner/meal-plans/for-week/?household=${householdId}&week_start=${weekStart}`,
+  )
+  return response.json()
+}
+
+export async function updateMealSlotRecipes(
+  slotId: string,
+  recipeIds: string[],
+): Promise<MealSlot> {
+  const response = await apiFetch(`/api/mealplanner/meal-slots/${slotId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ recipes: recipeIds }),
+  })
+  return response.json()
 }
