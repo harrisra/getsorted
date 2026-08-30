@@ -7,5 +7,11 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    watch: {
+      // Bind-mounted source on Windows/Docker Desktop doesn't reliably
+      // deliver inotify events into the container, so fall back to polling.
+      usePolling: true,
+      interval: 300,
+    },
   },
 })
