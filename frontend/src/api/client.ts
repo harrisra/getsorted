@@ -217,6 +217,7 @@ export interface GroceryItemRef {
   store: string
   name: string
   image_url: string
+  price: string | null
 }
 
 export interface RecipeIngredient {
@@ -238,11 +239,15 @@ export interface Recipe {
   instructions: string
   source_url: string
   ingredients: RecipeIngredient[]
+  current_cost: string | null
   created_by: string | null
   created_at: string
 }
 
-export type RecipeInput = Omit<Recipe, 'id' | 'created_by' | 'created_at' | 'ingredients'> & {
+export type RecipeInput = Omit<
+  Recipe,
+  'id' | 'current_cost' | 'created_by' | 'created_at' | 'ingredients'
+> & {
   ingredients: RecipeIngredientInput[]
 }
 

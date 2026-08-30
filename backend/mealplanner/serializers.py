@@ -7,7 +7,7 @@ from .models import MealPlan, MealSlot, Recipe, RecipeIngredient, ShoppingListIt
 class GroceryItemSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = GroceryItem
-        fields = ["id", "store", "name", "image_url"]
+        fields = ["id", "store", "name", "image_url", "price"]
 
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
@@ -20,6 +20,7 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
 
 class RecipeSerializer(serializers.ModelSerializer):
     ingredients = RecipeIngredientSerializer(many=True, required=False)
+    current_cost = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
@@ -32,10 +33,26 @@ class RecipeSerializer(serializers.ModelSerializer):
             "instructions",
             "source_url",
             "ingredients",
+            "current_cost",
             "created_by",
             "created_at",
         ]
         read_only_fields = ["created_by", "created_at"]
+
+    def get_current_cost(self, recipe):
+        """Sum of the current catalog price of each linked, priced ingredient.
+
+        Not a stored value — recalculated from live GroceryItem prices on every
+        read, and only covers ingredients that are linked to a catalog item
+        with a price set. Returns None (rather than 0) when nothing is priced,
+        so "no data" isn't confused with "free".
+        """
+        prices = [
+            ingredient.grocery_item.price
+            for ingredient in recipe.ingredients.all()
+            if ingredient.grocery_item_id and ingredient.grocery_item.price is not None
+        ]
+        return str(sum(prices)) if prices else None
 
     def create(self, validated_data):
         ingredients_data = validated_data.pop("ingredients", [])

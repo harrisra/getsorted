@@ -17,6 +17,10 @@ const MEAL_TYPE_LABELS: Record<Recipe['meal_type'], string> = {
   snack: 'Snack',
 }
 
+function pricedIngredientCount(recipe: Recipe): number {
+  return recipe.ingredients.filter((ing) => ing.grocery_item_detail?.price != null).length
+}
+
 export function RecipesPage() {
   const { currentHousehold } = useHouseholds()
   const [recipes, setRecipes] = useState<Recipe[] | null>(null)
@@ -115,6 +119,21 @@ export function RecipesPage() {
                   <p className="font-medium text-slate-800">{recipe.name}</p>
                   <p className="text-sm text-slate-500">
                     {MEAL_TYPE_LABELS[recipe.meal_type]} · Feeds {recipe.servings}
+                    {recipe.current_cost && (
+                      <>
+                        {' · '}
+                        <span className="font-medium text-slate-700">
+                          £{recipe.current_cost}
+                        </span>
+                        {pricedIngredientCount(recipe) < recipe.ingredients.length && (
+                          <span className="text-slate-400">
+                            {' '}
+                            (based on {pricedIngredientCount(recipe)} of{' '}
+                            {recipe.ingredients.length} ingredients)
+                          </span>
+                        )}
+                      </>
+                    )}
                     {recipe.source_url && (
                       <>
                         {' · '}
@@ -157,6 +176,7 @@ export function RecipesPage() {
                         <span className="text-slate-400">
                           {' '}
                           — linked to {ing.grocery_item_detail.store} {ing.grocery_item_detail.name}
+                          {ing.grocery_item_detail.price && ` (£${ing.grocery_item_detail.price})`}
                         </span>
                       )}
                     </li>
