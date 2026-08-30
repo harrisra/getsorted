@@ -21,3 +21,10 @@ class GroceryItemSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+
+class PopulateRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(
+        help_text="A rough product description, e.g. 'Tesco British Cooked Ham Slices 120g'."
+    )
+    product_url = serializers.URLField()

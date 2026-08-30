@@ -187,3 +187,23 @@ export async function updateGroceryItem(
 export async function deleteGroceryItem(id: string): Promise<void> {
   await apiFetch(`/api/catalog/grocery-items/${id}/`, { method: 'DELETE' })
 }
+
+export interface PopulateResult {
+  store: string
+  name: string
+  size: string
+  price: string | null
+  product_url: string
+  matched_exact: boolean
+}
+
+export async function populateGroceryItem(
+  name: string,
+  productUrl: string,
+): Promise<PopulateResult> {
+  const response = await apiFetch('/api/catalog/grocery-items/populate/', {
+    method: 'POST',
+    body: JSON.stringify({ name, product_url: productUrl }),
+  })
+  return response.json()
+}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError, type GroceryItemInput } from '../api/client'
+import { ApiError, type GroceryItemInput, populateGroceryItem } from '../api/client'
 
 const EMPTY: GroceryItemInput = {
   store: '',
@@ -25,9 +25,60 @@ export function GroceryItemForm({
   const [values, setValues] = useState<GroceryItemInput>(initialValue ?? EMPTY)
   const [errors, setErrors] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [populating, setPopulating] = useState(false)
+  const [populateMessage, setPopulateMessage] = useState<{
+    kind: 'error' | 'notice'
+    text: string
+  } | null>(null)
 
   function set<K extends keyof GroceryItemInput>(key: K, value: GroceryItemInput[K]) {
     setValues((prev) => ({ ...prev, [key]: value }))
+  }
+
+  async function handlePopulate() {
+    setPopulateMessage(null)
+    if (!values.name.trim()) {
+      setPopulateMessage({
+        kind: 'error',
+        text: 'Enter a product name first, then Populate to fill in the rest.',
+      })
+      return
+    }
+    if (!values.product_url.trim()) {
+      setPopulateMessage({ kind: 'error', text: 'Enter a product URL first.' })
+      return
+    }
+
+    setPopulating(true)
+    try {
+      const result = await populateGroceryItem(values.name, values.product_url)
+      setValues((prev) => ({
+        ...prev,
+        store: result.store || prev.store,
+        name: result.name || prev.name,
+        size: result.size || prev.size,
+        price: result.price ?? prev.price,
+        product_url: result.product_url || prev.product_url,
+      }))
+      setPopulateMessage(
+        result.matched_exact
+          ? { kind: 'notice', text: 'Matched the exact product.' }
+          : {
+              kind: 'notice',
+              text: "Couldn't confirm an exact match — filled in the closest product found. Please double-check size and price.",
+            },
+      )
+    } catch (err) {
+      setPopulateMessage({
+        kind: 'error',
+        text:
+          err instanceof ApiError
+            ? Object.values(err.fieldErrors).flat().join(' ')
+            : 'Could not populate from this URL.',
+      })
+    } finally {
+      setPopulating(false)
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -58,6 +109,36 @@ export function GroceryItemForm({
       )}
 
       <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2 space-y-1 text-sm">
+          <span className="font-medium text-slate-700">Product URL</span>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="https://…"
+              value={values.product_url}
+              onChange={(e) => set('product_url', e.target.value)}
+              className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={handlePopulate}
+              disabled={populating}
+              className="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            >
+              {populating ? 'Populating…' : 'Populate'}
+            </button>
+          </div>
+          {populateMessage && (
+            <p
+              className={`text-xs ${
+                populateMessage.kind === 'error' ? 'text-red-600' : 'text-amber-600'
+              }`}
+            >
+              {populateMessage.text}
+            </p>
+          )}
+        </div>
+
         <Field label="Store" required value={values.store} onChange={(v) => set('store', v)} />
         <Field label="Name" required value={values.name} onChange={(v) => set('name', v)} />
         <Field label="Brand" value={values.brand} onChange={(v) => set('brand', v)} />
@@ -72,13 +153,6 @@ export function GroceryItemForm({
           placeholder="e.g. 2.20"
           value={values.price ?? ''}
           onChange={(v) => set('price', v)}
-        />
-        <Field
-          label="Product URL"
-          type="url"
-          placeholder="https://…"
-          value={values.product_url}
-          onChange={(v) => set('product_url', v)}
         />
       </div>
 

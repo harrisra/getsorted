@@ -170,3 +170,7 @@ REST_AUTH = {
     "JWT_AUTH_REFRESH_COOKIE": "getsorted-refresh-token",
     "JWT_AUTH_SAMESITE": "Lax",
 }
+
+# --- Pepesto (grocery product lookup, used by the "Populate" button) --------
+
+PEPESTO_API_KEY = env("PEPESTO_API_KEY", default="")
