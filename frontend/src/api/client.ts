@@ -162,7 +162,9 @@ export interface GroceryItem {
   store: string
   name: string
   brand: string
-  size: string
+  grams: number | null
+  pieces: number | null
+  milliliters: number | null
   price: string | null
   product_url: string
   image_url: string
@@ -207,7 +209,9 @@ export async function deleteGroceryItem(id: string): Promise<void> {
 export interface PopulateResult {
   store: string
   name: string
-  size: string
+  grams: number | null
+  pieces: number | null
+  milliliters: number | null
   price: string | null
   product_url: string
   image_url: string
@@ -238,7 +242,9 @@ export interface GroceryItemRef {
 export interface RecipeIngredient {
   id: string
   name: string
-  quantity: string
+  grams: number | null
+  pieces: number | null
+  milliliters: number | null
   grocery_item: string | null
   grocery_item_detail: GroceryItemRef | null
 }

@@ -16,7 +16,11 @@ class GroceryItem(models.Model):
     store = models.CharField(max_length=255)
     name = models.CharField(max_length=255)
     brand = models.CharField(max_length=255, blank=True)
-    size = models.CharField(max_length=100, blank=True, help_text="e.g. 120g")
+    # At least one of these must be set — enforced in the serializer, since
+    # any one alone is a valid way to describe a product's size.
+    grams = models.PositiveIntegerField(null=True, blank=True)
+    pieces = models.PositiveIntegerField(null=True, blank=True)
+    milliliters = models.PositiveIntegerField(null=True, blank=True)
     price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     product_url = models.URLField(blank=True)
     image_url = models.URLField(blank=True)

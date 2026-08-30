@@ -49,7 +49,7 @@ export function RecipesPage() {
   const visibleRecipes = recipes?.filter((r) => r.household === currentHousehold.id) ?? null
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-8">
+    <div className="mx-auto max-w-[58.8rem] space-y-6 p-4 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold text-slate-800">Recipes</h1>
         {!showAddForm && (
@@ -100,7 +100,9 @@ export function RecipesPage() {
                   source_url: recipe.source_url,
                   ingredients: recipe.ingredients.map((ing) => ({
                     name: ing.name,
-                    quantity: ing.quantity,
+                    grams: ing.grams,
+                    pieces: ing.pieces,
+                    milliliters: ing.milliliters,
                     grocery_item: ing.grocery_item,
                   })),
                 }}

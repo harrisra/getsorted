@@ -66,7 +66,11 @@ class RecipeIngredient(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name="ingredients")
     name = models.CharField(max_length=255)
-    quantity = models.CharField(max_length=100, blank=True)
+    # At least one of these must be set — enforced in the serializer, since
+    # any one alone is a valid way to describe a quantity.
+    grams = models.PositiveIntegerField(null=True, blank=True)
+    pieces = models.PositiveIntegerField(null=True, blank=True)
+    milliliters = models.PositiveIntegerField(null=True, blank=True)
     grocery_item = models.ForeignKey(
         "catalog.GroceryItem",
         on_delete=models.SET_NULL,
@@ -80,7 +84,16 @@ class RecipeIngredient(models.Model):
         ordering = ["created_at"]
 
     def __str__(self):
-        return f"{self.quantity} {self.name}".strip()
+        amount = " ".join(
+            part
+            for part in [
+                f"{self.grams}g" if self.grams else "",
+                f"{self.pieces}pc" if self.pieces else "",
+                f"{self.milliliters}ml" if self.milliliters else "",
+            ]
+            if part
+        )
+        return f"{amount} {self.name}".strip()
 
 
 class MealPlan(models.Model):

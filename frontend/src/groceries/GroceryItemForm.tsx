@@ -6,7 +6,9 @@ const EMPTY: GroceryItemInput = {
   store: '',
   name: '',
   brand: '',
-  size: '',
+  grams: null,
+  pieces: null,
+  milliliters: null,
   price: '',
   product_url: '',
   image_url: '',
@@ -57,7 +59,9 @@ export function GroceryItemForm({
         ...prev,
         store: result.store || prev.store,
         name: result.name || prev.name,
-        size: result.size || prev.size,
+        grams: result.grams ?? prev.grams,
+        pieces: result.pieces ?? prev.pieces,
+        milliliters: result.milliliters ?? prev.milliliters,
         price: result.price ?? prev.price,
         product_url: result.product_url || prev.product_url,
         image_url: result.image_url || prev.image_url,
@@ -67,7 +71,7 @@ export function GroceryItemForm({
           ? { kind: 'notice', text: 'Matched the exact product.' }
           : {
               kind: 'notice',
-              text: "Couldn't confirm an exact match — filled in the closest product found. Please double-check size and price.",
+              text: "Couldn't confirm an exact match — filled in the closest product found. Please double-check grams/pieces/milliliters and price.",
             },
       )
     } catch (err) {
@@ -144,12 +148,42 @@ export function GroceryItemForm({
         <Field label="Store" required value={values.store} onChange={(v) => set('store', v)} />
         <Field label="Name" required value={values.name} onChange={(v) => set('name', v)} />
         <Field label="Brand" value={values.brand} onChange={(v) => set('brand', v)} />
-        <Field
-          label="Size"
-          placeholder="e.g. 120g"
-          value={values.size}
-          onChange={(v) => set('size', v)}
-        />
+        <div className="space-y-1 text-sm">
+          <span className="font-medium text-slate-700">Grams</span>
+          <input
+            type="number"
+            min={0}
+            placeholder="e.g. 120"
+            value={values.grams ?? ''}
+            onChange={(e) => set('grams', e.target.value === '' ? null : Number(e.target.value))}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          />
+        </div>
+        <div className="space-y-1 text-sm">
+          <span className="font-medium text-slate-700">Pieces</span>
+          <input
+            type="number"
+            min={0}
+            placeholder="e.g. 6"
+            value={values.pieces ?? ''}
+            onChange={(e) => set('pieces', e.target.value === '' ? null : Number(e.target.value))}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          />
+        </div>
+        <div className="space-y-1 text-sm">
+          <span className="font-medium text-slate-700">Milliliters</span>
+          <input
+            type="number"
+            min={0}
+            placeholder="e.g. 500"
+            value={values.milliliters ?? ''}
+            onChange={(e) =>
+              set('milliliters', e.target.value === '' ? null : Number(e.target.value))
+            }
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          />
+          <p className="text-[11px] text-slate-400">Provide grams, pieces, and/or milliliters</p>
+        </div>
         <Field
           label="Price"
           placeholder="e.g. 2.20"

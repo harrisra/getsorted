@@ -16,7 +16,15 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RecipeIngredient
-        fields = ["id", "name", "quantity", "grocery_item", "grocery_item_detail"]
+        fields = ["id", "name", "grams", "pieces", "milliliters", "grocery_item", "grocery_item_detail"]
+
+    def validate(self, attrs):
+        def value(field):
+            return attrs.get(field, getattr(self.instance, field, None) if self.instance else None)
+
+        if value("grams") is None and value("pieces") is None and value("milliliters") is None:
+            raise serializers.ValidationError("Provide grams, pieces, and/or milliliters.")
+        return attrs
 
 
 class RecipeImageMixin:

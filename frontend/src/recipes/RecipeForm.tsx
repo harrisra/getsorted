@@ -73,7 +73,10 @@ export function RecipeForm({
   }
 
   function addIngredient() {
-    set('ingredients', [...values.ingredients, { name: '', quantity: '', grocery_item: null }])
+    set('ingredients', [
+      ...values.ingredients,
+      { name: '', grams: null, pieces: null, milliliters: null, grocery_item: null },
+    ])
   }
 
   function updateIngredient(index: number, patch: Partial<RecipeIngredientInput>) {
@@ -93,13 +96,24 @@ export function RecipeForm({
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setErrors([])
+
+    const namedIngredients = values.ingredients.filter((ing) => ing.name.trim())
+    if (
+      namedIngredients.some(
+        (ing) => ing.grams == null && ing.pieces == null && ing.milliliters == null,
+      )
+    ) {
+      setErrors(['Each ingredient needs grams, pieces, and/or milliliters.'])
+      return
+    }
+
     setSubmitting(true)
     try {
       await onSubmit(
         {
           ...values,
           household: householdId,
-          ingredients: values.ingredients.filter((ing) => ing.name.trim()),
+          ingredients: namedIngredients,
         },
         imageFile,
       )
@@ -242,11 +256,40 @@ export function RecipeForm({
                 className="min-w-[8rem] flex-[2] rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
               />
               <input
-                type="text"
-                placeholder="Quantity"
-                value={ingredient.quantity}
-                onChange={(e) => updateIngredient(index, { quantity: e.target.value })}
-                className="min-w-[6rem] flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                type="number"
+                min={0}
+                placeholder="Grams"
+                value={ingredient.grams ?? ''}
+                onChange={(e) =>
+                  updateIngredient(index, {
+                    grams: e.target.value === '' ? null : Number(e.target.value),
+                  })
+                }
+                className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+              />
+              <input
+                type="number"
+                min={0}
+                placeholder="Pieces"
+                value={ingredient.pieces ?? ''}
+                onChange={(e) =>
+                  updateIngredient(index, {
+                    pieces: e.target.value === '' ? null : Number(e.target.value),
+                  })
+                }
+                className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+              />
+              <input
+                type="number"
+                min={0}
+                placeholder="ml"
+                value={ingredient.milliliters ?? ''}
+                onChange={(e) =>
+                  updateIngredient(index, {
+                    milliliters: e.target.value === '' ? null : Number(e.target.value),
+                  })
+                }
+                className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
               />
               <GroceryItemCombobox
                 items={groceryItems}

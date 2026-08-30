@@ -13,7 +13,9 @@ class GroceryItemSerializer(serializers.ModelSerializer):
             "store",
             "name",
             "brand",
-            "size",
+            "grams",
+            "pieces",
+            "milliliters",
             "price",
             "product_url",
             "image_url",
@@ -22,6 +24,14 @@ class GroceryItemSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+    def validate(self, attrs):
+        def value(field):
+            return attrs.get(field, getattr(self.instance, field, None) if self.instance else None)
+
+        if value("grams") is None and value("pieces") is None and value("milliliters") is None:
+            raise serializers.ValidationError("Provide grams, pieces, and/or milliliters.")
+        return attrs
 
 
 class PopulateRequestSerializer(serializers.Serializer):

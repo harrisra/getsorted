@@ -11,6 +11,16 @@ import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { PencilIcon } from '../icons'
 import { GroceryItemForm } from './GroceryItemForm'
 
+function formatSize(item: GroceryItem): string {
+  return [
+    item.grams != null ? `${item.grams}g` : null,
+    item.pieces != null ? `${item.pieces}pc` : null,
+    item.milliliters != null ? `${item.milliliters}ml` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
 export function GroceryItemsPage() {
   const [items, setItems] = useState<GroceryItem[] | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -73,7 +83,9 @@ export function GroceryItemsPage() {
                   store: item.store,
                   name: item.name,
                   brand: item.brand,
-                  size: item.size,
+                  grams: item.grams,
+                  pieces: item.pieces,
+                  milliliters: item.milliliters,
                   price: item.price,
                   product_url: item.product_url,
                   image_url: item.image_url,
@@ -104,7 +116,7 @@ export function GroceryItemsPage() {
                     {item.store} — {item.name}
                   </p>
                   <p className="truncate text-sm text-slate-500">
-                    {[item.brand, item.size].filter(Boolean).join(' · ')}
+                    {[item.brand, formatSize(item)].filter(Boolean).join(' · ')}
                     {item.price && ` · £${item.price}`}
                     {item.product_url && (
                       <>

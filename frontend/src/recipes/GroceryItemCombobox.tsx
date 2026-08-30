@@ -1,8 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import type { GroceryItem } from '../api/client'
 
+function formatSize(item: GroceryItem): string {
+  return [
+    item.grams != null ? `${item.grams}g` : null,
+    item.pieces != null ? `${item.pieces}pc` : null,
+    item.milliliters != null ? `${item.milliliters}ml` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
 function label(item: GroceryItem): string {
-  return `${item.store} — ${item.name}${item.size ? ` (${item.size})` : ''}`
+  const size = formatSize(item)
+  return `${item.store} — ${item.name}${size ? ` (${size})` : ''}`
 }
 
 export function GroceryItemCombobox({
