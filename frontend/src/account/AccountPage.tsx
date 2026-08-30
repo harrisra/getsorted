@@ -4,7 +4,7 @@ export function AccountPage() {
   const { user } = useAuth()
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-8">
+    <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-8">
       <h1 className="text-xl font-semibold text-slate-800">Account</h1>
 
       <dl className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">

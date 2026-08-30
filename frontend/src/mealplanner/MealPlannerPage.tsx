@@ -84,8 +84,8 @@ export function MealPlannerPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-8">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full flex-col space-y-4 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-slate-800">Meal planner</h1>
         <div className="flex items-center gap-3">
           <button
@@ -122,7 +122,7 @@ export function MealPlannerPage() {
       {!mealPlan && <p className="text-sm text-slate-400">Loading…</p>}
 
       {mealPlan && (
-        <div className="overflow-x-auto">
+        <div className="min-h-0 flex-1 overflow-auto">
           <div
             className="grid gap-2"
             style={{ gridTemplateColumns: '6rem repeat(7, minmax(9rem, 1fr))' }}

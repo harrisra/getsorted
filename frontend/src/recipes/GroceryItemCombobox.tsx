@@ -46,7 +46,7 @@ export function GroceryItemCombobox({
   }
 
   return (
-    <div ref={containerRef} className="relative flex-[2]">
+    <div ref={containerRef} className="relative min-w-[10rem] flex-[2]">
       <input
         type="text"
         placeholder="Search grocery items…"

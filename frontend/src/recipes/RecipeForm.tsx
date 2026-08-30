@@ -103,8 +103,8 @@ export function RecipeForm({
         </ul>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <label className="col-span-2 space-y-1 text-sm">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="sm:col-span-2 space-y-1 text-sm">
           <span className="font-medium text-slate-700">Name</span>
           <input
             type="text"
@@ -142,7 +142,7 @@ export function RecipeForm({
           />
         </label>
 
-        <label className="col-span-2 space-y-1 text-sm">
+        <label className="sm:col-span-2 space-y-1 text-sm">
           <span className="font-medium text-slate-700">Recipe URL (optional)</span>
           <input
             type="url"
@@ -153,7 +153,7 @@ export function RecipeForm({
           />
         </label>
 
-        <label className="col-span-2 space-y-1 text-sm">
+        <label className="sm:col-span-2 space-y-1 text-sm">
           <span className="font-medium text-slate-700">Instructions (optional)</span>
           <textarea
             rows={3}
@@ -168,20 +168,23 @@ export function RecipeForm({
         <span className="text-sm font-medium text-slate-700">Ingredients</span>
         <div className="space-y-2">
           {values.ingredients.map((ingredient, index) => (
-            <div key={index} className="flex gap-2">
+            <div
+              key={index}
+              className="flex flex-wrap items-center gap-2 rounded-md border border-slate-100 p-2 sm:border-0 sm:p-0"
+            >
               <input
                 type="text"
                 placeholder="Ingredient"
                 value={ingredient.name}
                 onChange={(e) => updateIngredient(index, { name: e.target.value })}
-                className="flex-[2] rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                className="min-w-[8rem] flex-[2] rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
               />
               <input
                 type="text"
                 placeholder="Quantity"
                 value={ingredient.quantity}
                 onChange={(e) => updateIngredient(index, { quantity: e.target.value })}
-                className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                className="min-w-[6rem] flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
               />
               <GroceryItemCombobox
                 items={groceryItems}

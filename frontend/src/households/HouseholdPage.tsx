@@ -58,7 +58,7 @@ export function HouseholdPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-8">
+    <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-8">
       <h1 className="text-xl font-semibold text-slate-800">Your households</h1>
 
       <div className="space-y-4">

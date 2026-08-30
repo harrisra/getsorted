@@ -51,8 +51,8 @@ export function RecipesPage() {
   const visibleRecipes = recipes?.filter((r) => r.household === currentHousehold.id) ?? null
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-8">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold text-slate-800">Recipes</h1>
         {!showAddForm && (
           <button
@@ -114,9 +114,9 @@ export function RecipesPage() {
             </li>
           ) : (
             <li key={recipe.id} className="px-4 py-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-slate-800">{recipe.name}</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-800">{recipe.name}</p>
                   <p className="text-sm text-slate-500">
                     {MEAL_TYPE_LABELS[recipe.meal_type]} · Feeds {recipe.servings}
                     {recipe.current_cost && (

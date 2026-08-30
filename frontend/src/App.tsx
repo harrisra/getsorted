@@ -8,7 +8,7 @@ import { CreateHouseholdPage } from './households/CreateHouseholdPage'
 import { HouseholdPage } from './households/HouseholdPage'
 import { HouseholdsProvider, useHouseholds } from './households/HouseholdsContext'
 import { MealPlannerPage } from './mealplanner/MealPlannerPage'
-import { Navigation, type NavTab } from './nav/Navigation'
+import { Sidebar, type NavTab } from './nav/Sidebar'
 import { RecipesPage } from './recipes/RecipesPage'
 
 type HealthStatus = 'checking' | 'ok' | 'error'
@@ -34,19 +34,23 @@ function Dashboard() {
   const status = useHealthStatus()
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Navigation activeTab={activeTab} onSelectTab={setActiveTab} />
-      {activeTab === 'account' && <AccountPage />}
-      {activeTab === 'household' && <HouseholdPage />}
-      {activeTab === 'groceries' && <GroceryItemsPage />}
-      {activeTab === 'recipes' && <RecipesPage />}
-      {activeTab === 'mealplanner' && <MealPlannerPage />}
-      <p className="mx-auto max-w-2xl px-8 pb-4 text-xs text-slate-400">
-        Backend API:{' '}
-        {status === 'checking' && 'checking…'}
-        {status === 'ok' && <span className="text-green-600">connected</span>}
-        {status === 'error' && <span className="text-red-600">unreachable</span>}
-      </p>
+    <div className="flex h-screen overflow-hidden bg-slate-50">
+      <Sidebar activeTab={activeTab} onSelectTab={setActiveTab} />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <main className="flex-1 overflow-y-auto">
+          {activeTab === 'account' && <AccountPage />}
+          {activeTab === 'household' && <HouseholdPage />}
+          {activeTab === 'groceries' && <GroceryItemsPage />}
+          {activeTab === 'recipes' && <RecipesPage />}
+          {activeTab === 'mealplanner' && <MealPlannerPage />}
+        </main>
+        <p className="shrink-0 border-t border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-400">
+          Backend API:{' '}
+          {status === 'checking' && 'checking…'}
+          {status === 'ok' && <span className="text-green-600">connected</span>}
+          {status === 'error' && <span className="text-red-600">unreachable</span>}
+        </p>
+      </div>
     </div>
   )
 }

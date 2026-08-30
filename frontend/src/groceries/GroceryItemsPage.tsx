@@ -34,8 +34,8 @@ export function GroceryItemsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-8">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold text-slate-800">Grocery items</h1>
         {!showAddForm && (
           <button
@@ -91,8 +91,11 @@ export function GroceryItemsPage() {
               />
             </li>
           ) : (
-            <li key={item.id} className="flex items-center justify-between gap-3 px-4 py-3">
-              <div className="flex items-center gap-3">
+            <li
+              key={item.id}
+              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+            >
+              <div className="flex min-w-0 items-center gap-3">
                 {item.image_url && (
                   <img
                     src={item.image_url}
@@ -100,11 +103,11 @@ export function GroceryItemsPage() {
                     className="h-10 w-10 shrink-0 rounded border border-slate-200 object-cover"
                   />
                 )}
-                <div>
-                  <p className="font-medium text-slate-800">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-800">
                     {item.store} — {item.name}
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="truncate text-sm text-slate-500">
                     {[item.brand, item.size].filter(Boolean).join(' · ')}
                     {item.price && ` · £${item.price}`}
                     {item.product_url && (
