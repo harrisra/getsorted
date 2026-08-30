@@ -30,12 +30,15 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE'])
 async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const method = (options.method ?? 'GET').toUpperCase()
   const csrfToken = getCookie('csrftoken')
+  // FormData bodies must NOT have Content-Type set manually — the browser
+  // needs to add the multipart boundary itself.
+  const isFormData = options.body instanceof FormData
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(!SAFE_METHODS.has(method) && csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
       ...options.headers,
     },
@@ -250,6 +253,7 @@ export interface Recipe {
   servings: number
   instructions: string
   source_url: string
+  image: string | null
   ingredients: RecipeIngredient[]
   current_cost: string | null
   created_by: string | null
@@ -258,7 +262,7 @@ export interface Recipe {
 
 export type RecipeInput = Omit<
   Recipe,
-  'id' | 'current_cost' | 'created_by' | 'created_at' | 'ingredients'
+  'id' | 'image' | 'current_cost' | 'created_by' | 'created_at' | 'ingredients'
 > & {
   ingredients: RecipeIngredientInput[]
 }
@@ -286,6 +290,20 @@ export async function updateRecipe(id: string, recipe: RecipeInput): Promise<Rec
 
 export async function deleteRecipe(id: string): Promise<void> {
   await apiFetch(`/api/mealplanner/recipes/${id}/`, { method: 'DELETE' })
+}
+
+export async function uploadRecipeImage(id: string, file: File): Promise<Recipe> {
+  const formData = new FormData()
+  formData.append('image', file)
+  const response = await apiFetch(`/api/mealplanner/recipes/${id}/image/`, {
+    method: 'PUT',
+    body: formData,
+  })
+  return response.json()
+}
+
+export async function deleteRecipeImage(id: string): Promise<void> {
+  await apiFetch(`/api/mealplanner/recipes/${id}/image/`, { method: 'DELETE' })
 }
 
 export interface RecipeSummary {

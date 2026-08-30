@@ -1,6 +1,7 @@
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from accounts.models import Household
@@ -13,6 +14,14 @@ class MealType(models.TextChoices):
     SNACK = "snack", "Snack"
 
 
+MAX_RECIPE_IMAGE_MB = 5
+
+
+def validate_recipe_image_size(file):
+    if file.size > MAX_RECIPE_IMAGE_MB * 1024 * 1024:
+        raise ValidationError(f"Image must be smaller than {MAX_RECIPE_IMAGE_MB}MB.")
+
+
 class Recipe(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     household = models.ForeignKey(Household, on_delete=models.CASCADE, related_name="recipes")
@@ -21,6 +30,9 @@ class Recipe(models.Model):
     servings = models.PositiveSmallIntegerField(default=4, help_text="Number of people it feeds")
     instructions = models.TextField(blank=True)
     source_url = models.URLField(blank=True)
+    image = models.ImageField(
+        upload_to="recipes/", blank=True, null=True, validators=[validate_recipe_image_size]
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
     )

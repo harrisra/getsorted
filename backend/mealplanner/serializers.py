@@ -32,12 +32,13 @@ class RecipeSerializer(serializers.ModelSerializer):
             "servings",
             "instructions",
             "source_url",
+            "image",
             "ingredients",
             "current_cost",
             "created_by",
             "created_at",
         ]
-        read_only_fields = ["created_by", "created_at"]
+        read_only_fields = ["image", "created_by", "created_at"]
 
     def get_current_cost(self, recipe):
         cost = recipe.current_cost

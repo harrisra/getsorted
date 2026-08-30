@@ -31,24 +31,41 @@ const MEAL_TYPES: { value: MealType; label: string }[] = [
 export function RecipeForm({
   householdId,
   initialValue,
+  existingImageUrl,
   submitLabel,
   onSubmit,
+  onRemoveImage,
   onCancel,
 }: {
   householdId: string
   initialValue?: RecipeFormValues
+  existingImageUrl?: string | null
   submitLabel: string
-  onSubmit: (recipe: RecipeInput) => Promise<void>
+  onSubmit: (recipe: RecipeInput, imageFile: File | null) => Promise<void>
+  onRemoveImage?: () => Promise<void>
   onCancel?: () => void
 }) {
   const [values, setValues] = useState<RecipeFormValues>(initialValue ?? EMPTY)
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([])
   const [errors, setErrors] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
+  const [removingImage, setRemovingImage] = useState(false)
 
   useEffect(() => {
     fetchGroceryItems().then(setGroceryItems)
   }, [])
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreviewUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(imageFile)
+    setImagePreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [imageFile])
 
   function set<K extends keyof RecipeFormValues>(key: K, value: RecipeFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }))
@@ -77,11 +94,14 @@ export function RecipeForm({
     setErrors([])
     setSubmitting(true)
     try {
-      await onSubmit({
-        ...values,
-        household: householdId,
-        ingredients: values.ingredients.filter((ing) => ing.name.trim()),
-      })
+      await onSubmit(
+        {
+          ...values,
+          household: householdId,
+          ingredients: values.ingredients.filter((ing) => ing.name.trim()),
+        },
+        imageFile,
+      )
     } catch (err) {
       setErrors(
         err instanceof ApiError
@@ -90,6 +110,16 @@ export function RecipeForm({
       )
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleRemoveImage() {
+    if (!onRemoveImage) return
+    setRemovingImage(true)
+    try {
+      await onRemoveImage()
+    } finally {
+      setRemovingImage(false)
     }
   }
 
@@ -162,6 +192,35 @@ export function RecipeForm({
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
           />
         </label>
+
+        <div className="sm:col-span-2 space-y-1 text-sm">
+          <span className="font-medium text-slate-700">Photo (optional)</span>
+          <div className="flex items-center gap-3">
+            {(imagePreviewUrl || existingImageUrl) && (
+              <img
+                src={imagePreviewUrl ?? existingImageUrl ?? undefined}
+                alt=""
+                className="h-16 w-16 shrink-0 rounded border border-slate-200 object-cover"
+              />
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+              className="text-sm text-slate-600"
+            />
+            {existingImageUrl && !imageFile && onRemoveImage && (
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                disabled={removingImage}
+                className="shrink-0 text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
+              >
+                {removingImage ? 'Removing…' : 'Remove'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="space-y-2">

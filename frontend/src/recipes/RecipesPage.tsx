@@ -4,8 +4,10 @@ import {
   type RecipeInput,
   createRecipe,
   deleteRecipe,
+  deleteRecipeImage,
   fetchRecipes,
   updateRecipe,
+  uploadRecipeImage,
 } from '../api/client'
 import { useHouseholds } from '../households/HouseholdsContext'
 import { RecipeForm } from './RecipeForm'
@@ -71,8 +73,9 @@ export function RecipesPage() {
             householdId={currentHousehold.id}
             submitLabel="Add recipe"
             onCancel={() => setShowAddForm(false)}
-            onSubmit={async (recipe: RecipeInput) => {
-              await createRecipe(recipe)
+            onSubmit={async (recipe: RecipeInput, imageFile: File | null) => {
+              const saved = await createRecipe(recipe)
+              if (imageFile) await uploadRecipeImage(saved.id, imageFile)
               setShowAddForm(false)
               await refresh()
             }}
@@ -92,6 +95,7 @@ export function RecipesPage() {
               <RecipeForm
                 householdId={currentHousehold.id}
                 submitLabel="Save"
+                existingImageUrl={recipe.image}
                 initialValue={{
                   name: recipe.name,
                   meal_type: recipe.meal_type,
@@ -105,9 +109,14 @@ export function RecipesPage() {
                   })),
                 }}
                 onCancel={() => setEditingId(null)}
-                onSubmit={async (updated) => {
+                onSubmit={async (updated, imageFile) => {
                   await updateRecipe(recipe.id, updated)
+                  if (imageFile) await uploadRecipeImage(recipe.id, imageFile)
                   setEditingId(null)
+                  await refresh()
+                }}
+                onRemoveImage={async () => {
+                  await deleteRecipeImage(recipe.id)
                   await refresh()
                 }}
               />
@@ -115,39 +124,48 @@ export function RecipesPage() {
           ) : (
             <li key={recipe.id} className="px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-slate-800">{recipe.name}</p>
-                  <p className="text-sm text-slate-500">
-                    {MEAL_TYPE_LABELS[recipe.meal_type]} · Feeds {recipe.servings}
-                    {recipe.current_cost && (
-                      <>
-                        {' · '}
-                        <span className="font-medium text-slate-700">
-                          £{recipe.current_cost}
-                        </span>
-                        {pricedIngredientCount(recipe) < recipe.ingredients.length && (
-                          <span className="text-slate-400">
-                            {' '}
-                            (based on {pricedIngredientCount(recipe)} of{' '}
-                            {recipe.ingredients.length} ingredients)
+                <div className="flex min-w-0 items-center gap-3">
+                  {recipe.image && (
+                    <img
+                      src={recipe.image}
+                      alt=""
+                      className="h-12 w-12 shrink-0 rounded border border-slate-200 object-cover"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-slate-800">{recipe.name}</p>
+                    <p className="text-sm text-slate-500">
+                      {MEAL_TYPE_LABELS[recipe.meal_type]} · Feeds {recipe.servings}
+                      {recipe.current_cost && (
+                        <>
+                          {' · '}
+                          <span className="font-medium text-slate-700">
+                            £{recipe.current_cost}
                           </span>
-                        )}
-                      </>
-                    )}
-                    {recipe.source_url && (
-                      <>
-                        {' · '}
-                        <a
-                          href={recipe.source_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          Recipe link
-                        </a>
-                      </>
-                    )}
-                  </p>
+                          {pricedIngredientCount(recipe) < recipe.ingredients.length && (
+                            <span className="text-slate-400">
+                              {' '}
+                              (based on {pricedIngredientCount(recipe)} of{' '}
+                              {recipe.ingredients.length} ingredients)
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {recipe.source_url && (
+                        <>
+                          {' · '}
+                          <a
+                            href={recipe.source_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            Recipe link
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex shrink-0 gap-3">
                   <button

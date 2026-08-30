@@ -1,10 +1,12 @@
 from datetime import date, timedelta
 from itertools import product
 
-from rest_framework import viewsets
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import get_object_or_404
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -35,6 +37,32 @@ class RecipeViewSet(HouseholdScopedViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @action(
+        detail=True,
+        methods=["put", "delete"],
+        url_path="image",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def image(self, request, pk=None):
+        recipe = self.get_object()
+
+        if request.method == "DELETE":
+            recipe.image.delete(save=True)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        file = request.data.get("image")
+        if not file:
+            raise ValidationError({"image": ["No file provided."]})
+
+        recipe.image.delete(save=False)
+        recipe.image = file
+        try:
+            recipe.full_clean(validate_unique=False)
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages)
+        recipe.save()
+        return Response(self.get_serializer(recipe).data)
 
 
 class MealPlanViewSet(HouseholdScopedViewSet):
