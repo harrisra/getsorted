@@ -3,6 +3,7 @@ import { API_BASE_URL } from './api/client'
 import { AccountPage } from './account/AccountPage'
 import { AuthPage } from './auth/AuthPage'
 import { useAuth } from './auth/AuthContext'
+import { GroceryItemsPage } from './groceries/GroceryItemsPage'
 import { CreateHouseholdPage } from './households/CreateHouseholdPage'
 import { HouseholdPage } from './households/HouseholdPage'
 import { HouseholdsProvider, useHouseholds } from './households/HouseholdsContext'
@@ -35,6 +36,7 @@ function Dashboard() {
       <Navigation activeTab={activeTab} onSelectTab={setActiveTab} />
       {activeTab === 'account' && <AccountPage />}
       {activeTab === 'household' && <HouseholdPage />}
+      {activeTab === 'groceries' && <GroceryItemsPage />}
       <p className="mx-auto max-w-2xl px-8 pb-4 text-xs text-slate-400">
         Backend API:{' '}
         {status === 'checking' && 'checking…'}

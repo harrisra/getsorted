@@ -141,3 +141,49 @@ export async function removeMember(householdId: string, userId: string): Promise
     method: 'DELETE',
   })
 }
+
+export interface GroceryItem {
+  id: string
+  store: string
+  name: string
+  brand: string
+  size: string
+  price: string | null
+  product_url: string
+  created_by_email: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type GroceryItemInput = Omit<
+  GroceryItem,
+  'id' | 'created_by_email' | 'created_at' | 'updated_at'
+>
+
+export async function fetchGroceryItems(): Promise<GroceryItem[]> {
+  const response = await apiFetch('/api/catalog/grocery-items/')
+  return response.json()
+}
+
+export async function createGroceryItem(item: GroceryItemInput): Promise<GroceryItem> {
+  const response = await apiFetch('/api/catalog/grocery-items/', {
+    method: 'POST',
+    body: JSON.stringify(item),
+  })
+  return response.json()
+}
+
+export async function updateGroceryItem(
+  id: string,
+  item: GroceryItemInput,
+): Promise<GroceryItem> {
+  const response = await apiFetch(`/api/catalog/grocery-items/${id}/`, {
+    method: 'PUT',
+    body: JSON.stringify(item),
+  })
+  return response.json()
+}
+
+export async function deleteGroceryItem(id: string): Promise<void> {
+  await apiFetch(`/api/catalog/grocery-items/${id}/`, { method: 'DELETE' })
+}

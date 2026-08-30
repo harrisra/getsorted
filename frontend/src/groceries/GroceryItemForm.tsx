@@ -1,0 +1,135 @@
+import { useState } from 'react'
+import type { FormEvent } from 'react'
+import { ApiError, type GroceryItemInput } from '../api/client'
+
+const EMPTY: GroceryItemInput = {
+  store: '',
+  name: '',
+  brand: '',
+  size: '',
+  price: '',
+  product_url: '',
+}
+
+export function GroceryItemForm({
+  initialValue,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}: {
+  initialValue?: GroceryItemInput
+  submitLabel: string
+  onSubmit: (item: GroceryItemInput) => Promise<void>
+  onCancel?: () => void
+}) {
+  const [values, setValues] = useState<GroceryItemInput>(initialValue ?? EMPTY)
+  const [errors, setErrors] = useState<string[]>([])
+  const [submitting, setSubmitting] = useState(false)
+
+  function set<K extends keyof GroceryItemInput>(key: K, value: GroceryItemInput[K]) {
+    setValues((prev) => ({ ...prev, [key]: value }))
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    setErrors([])
+    setSubmitting(true)
+    try {
+      await onSubmit({ ...values, price: values.price?.trim() || null })
+    } catch (err) {
+      setErrors(
+        err instanceof ApiError
+          ? Object.values(err.fieldErrors).flat()
+          : ['Something went wrong. Please try again.'],
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      {errors.length > 0 && (
+        <ul className="space-y-1 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {errors.map((message) => (
+            <li key={message}>{message}</li>
+          ))}
+        </ul>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Store" required value={values.store} onChange={(v) => set('store', v)} />
+        <Field label="Name" required value={values.name} onChange={(v) => set('name', v)} />
+        <Field label="Brand" value={values.brand} onChange={(v) => set('brand', v)} />
+        <Field
+          label="Size"
+          placeholder="e.g. 120g"
+          value={values.size}
+          onChange={(v) => set('size', v)}
+        />
+        <Field
+          label="Price"
+          placeholder="e.g. 2.20"
+          value={values.price ?? ''}
+          onChange={(v) => set('price', v)}
+        />
+        <Field
+          label="Product URL"
+          type="url"
+          placeholder="https://…"
+          value={values.product_url}
+          onChange={(v) => set('product_url', v)}
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+        >
+          {submitting ? 'Saving…' : submitLabel}
+        </button>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </form>
+  )
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  required,
+  type = 'text',
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  required?: boolean
+  type?: string
+  placeholder?: string
+}) {
+  return (
+    <label className="space-y-1 text-sm">
+      <span className="font-medium text-slate-700">{label}</span>
+      <input
+        type={type}
+        required={required}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+      />
+    </label>
+  )
+}

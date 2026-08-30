@@ -1,10 +1,11 @@
 import { useAuth } from '../auth/AuthContext'
 
-export type NavTab = 'account' | 'household'
+export type NavTab = 'account' | 'household' | 'groceries'
 
 const TABS: { id: NavTab; label: string }[] = [
   { id: 'account', label: 'Account' },
   { id: 'household', label: 'Household' },
+  { id: 'groceries', label: 'Groceries' },
 ]
 
 export function Navigation({

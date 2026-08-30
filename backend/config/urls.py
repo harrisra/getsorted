@@ -21,4 +21,5 @@ urlpatterns = [
     path("api/accounts/", include("accounts.urls")),
     # Sub-apps
     path("api/mealplanner/", include("mealplanner.urls")),
+    path("api/catalog/", include("catalog.urls")),
 ]
