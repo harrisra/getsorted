@@ -133,6 +133,11 @@ CORS_ALLOWED_ORIGINS = env.list(
 )
 CORS_ALLOW_CREDENTIALS = True
 
+# Cookie-authenticated POST/PUT/PATCH/DELETE requests from the SPA are
+# cross-origin (different port in dev, different subdomain in prod), so
+# Django's CSRF Origin check needs these listed explicitly too.
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost:5173"])
+
 # --- django-allauth / dj-rest-auth / Google OAuth ---------------------------
 
 AUTHENTICATION_BACKENDS = [

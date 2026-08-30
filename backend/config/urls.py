@@ -18,6 +18,7 @@ urlpatterns = [
     path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
     path("api/auth/google/", GoogleLogin.as_view(), name="google_login"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/accounts/", include("accounts.urls")),
     # Sub-apps
     path("api/mealplanner/", include("mealplanner.urls")),
 ]

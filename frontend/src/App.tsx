@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { API_BASE_URL } from './api/client'
 import { AuthPage } from './auth/AuthPage'
 import { useAuth } from './auth/AuthContext'
+import { CreateHouseholdPage } from './households/CreateHouseholdPage'
+import { HouseholdsProvider, useHouseholds } from './households/HouseholdsContext'
 
 type HealthStatus = 'checking' | 'ok' | 'error'
 
-function App() {
-  const { user, loading, logout } = useAuth()
+function useHealthStatus(): HealthStatus {
   const [status, setStatus] = useState<HealthStatus>('checking')
 
   useEffect(() => {
@@ -19,23 +20,23 @@ function App() {
       .catch(() => setStatus('error'))
   }, [])
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="text-slate-500">Loading…</p>
-      </div>
-    )
-  }
+  return status
+}
 
-  if (!user) {
-    return <AuthPage />
-  }
+function Dashboard() {
+  const { user, logout } = useAuth()
+  const { households } = useHouseholds()
+  const status = useHealthStatus()
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <div className="space-y-4 text-center">
         <h1 className="text-3xl font-semibold text-slate-800">GetSorted</h1>
-        <p className="text-slate-600">Signed in as {user.email}</p>
+        <p className="text-slate-600">Signed in as {user?.email}</p>
+        <p className="text-slate-600">
+          Household{households.length > 1 ? 's' : ''}:{' '}
+          {households.map((h) => h.name).join(', ')}
+        </p>
         <p className="text-slate-500">
           Backend API:{' '}
           {status === 'checking' && 'checking…'}
@@ -51,6 +52,46 @@ function App() {
         </button>
       </div>
     </div>
+  )
+}
+
+function AuthenticatedApp() {
+  const { households, loading } = useHouseholds()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="text-slate-500">Loading…</p>
+      </div>
+    )
+  }
+
+  if (households.length === 0) {
+    return <CreateHouseholdPage />
+  }
+
+  return <Dashboard />
+}
+
+function App() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="text-slate-500">Loading…</p>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <AuthPage />
+  }
+
+  return (
+    <HouseholdsProvider>
+      <AuthenticatedApp />
+    </HouseholdsProvider>
   )
 }
 

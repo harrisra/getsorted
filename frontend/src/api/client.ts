@@ -20,12 +20,23 @@ function flattenFieldErrors(fieldErrors: Record<string, string[]>): string[] {
   return Object.values(fieldErrors).flat()
 }
 
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE'])
+
 async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  const method = (options.method ?? 'GET').toUpperCase()
+  const csrfToken = getCookie('csrftoken')
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(!SAFE_METHODS.has(method) && csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
       ...options.headers,
     },
   })
@@ -82,5 +93,25 @@ export async function fetchCurrentUser(): Promise<CurrentUser | null> {
     credentials: 'include',
   })
   if (!response.ok) return null
+  return response.json()
+}
+
+export interface Household {
+  id: string
+  name: string
+  created_at: string
+  role: 'admin' | 'member'
+}
+
+export async function fetchHouseholds(): Promise<Household[]> {
+  const response = await apiFetch('/api/accounts/households/')
+  return response.json()
+}
+
+export async function createHousehold(name: string): Promise<Household> {
+  const response = await apiFetch('/api/accounts/households/', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
   return response.json()
 }
