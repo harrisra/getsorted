@@ -8,6 +8,7 @@ import {
   type RecipeInput,
   fetchGroceryItems,
 } from '../api/client'
+import { GroceryItemCombobox } from './GroceryItemCombobox'
 
 type RecipeFormValues = Omit<RecipeInput, 'household'>
 
@@ -182,21 +183,11 @@ export function RecipeForm({
                 onChange={(e) => updateIngredient(index, { quantity: e.target.value })}
                 className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
               />
-              <select
-                value={ingredient.grocery_item ?? ''}
-                onChange={(e) =>
-                  updateIngredient(index, { grocery_item: e.target.value || null })
-                }
-                className="flex-[2] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
-              >
-                <option value="">Not linked</option>
-                {groceryItems.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.store} — {item.name}
-                    {item.size && ` (${item.size})`}
-                  </option>
-                ))}
-              </select>
+              <GroceryItemCombobox
+                items={groceryItems}
+                value={ingredient.grocery_item}
+                onChange={(id) => updateIngredient(index, { grocery_item: id })}
+              />
               <button
                 type="button"
                 onClick={() => removeIngredient(index)}
