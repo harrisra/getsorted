@@ -1,7 +1,7 @@
 # getsorted
 
 
-## Developing on Windows
+## Developing on Windows (Note I now do this in powershell)
 
 ### Setup
 
@@ -17,3 +17,19 @@ docker compose up --build
 docker compose exec backend python manage.py migrate
 Then visit http://localhost:5173 (frontend, will show "connected" once backend is up) and http://localhost:8000/admin/.
 
+## First time Django setup
+
+
+The admin superuser is created interactively on first run. From the codebase:
+
+- backend/accounts/managers.py defines a standard create_superuser (the custom User model is email-based, no username field), but nothing invokes it with preset values.
+- There are no fixtures, migrations, entrypoint scripts, or DJANGO_SUPERUSER_* env vars that create an admin account.
+- docs/setup.md:38 and CLAUDE.md:90 both say you create it yourself:
+
+docker compose exec backend python manage.py createsuperuser
+
+That command prompts you for an email and password of your choosing — those become your admin credentials at http://localhost:8000/admin/.
+
+One thing to note that's easy to confuse with an "admin credential": the Postgres database credentials are defaulted in docker-compose.yml (db/user/password all getsorted), but that's the database, not the Django admin login.
+
+So: whatever email/password you entered at createsuperuser time. If you've forgotten it, you can reset it with docker compose exec backend python manage.py changepassword <your-email>, or create a new superuser with the command above.
