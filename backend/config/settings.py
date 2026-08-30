@@ -20,6 +20,15 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", default="insecure-dev-key-change-me")
 DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
+# In k3s, TLS terminates at the Traefik ingress and traffic reaches this pod
+# as plain HTTP, so without this Django thinks every request is insecure —
+# breaking the CSRF Origin check (it computes its own scheme as http while
+# the browser's Origin header says https) and anything gated on
+# request.is_secure(). Safe because the backend Service is ClusterIP-only;
+# the ingress is the sole entry point and sets this header itself, so it
+# can't be spoofed by an external client. No-op locally (no such header).
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
