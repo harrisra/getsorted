@@ -139,6 +139,14 @@ CORS_ALLOW_CREDENTIALS = True
 # Django's CSRF Origin check needs these listed explicitly too.
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost:5173"])
 
+# When the SPA and API are on sibling subdomains (e.g. app.example.com and
+# api.example.com), the CSRF cookie needs an explicit shared parent domain
+# (e.g. ".example.com") — otherwise it's scoped to the API's host only, and
+# the SPA's JS can't read it to send back as the X-CSRFToken header, which
+# fails as "CSRF token missing" even though the cookie itself reaches the
+# server fine. Not needed for local dev (same host, different port only).
+CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
+
 # --- django-allauth / dj-rest-auth / Google OAuth ---------------------------
 
 AUTHENTICATION_BACKENDS = [
