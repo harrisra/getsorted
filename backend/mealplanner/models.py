@@ -6,12 +6,21 @@ from django.db import models
 from accounts.models import Household
 
 
+class MealType(models.TextChoices):
+    BREAKFAST = "breakfast", "Breakfast"
+    LUNCH = "lunch", "Lunch"
+    DINNER = "dinner", "Dinner"
+    SNACK = "snack", "Snack"
+
+
 class Recipe(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     household = models.ForeignKey(Household, on_delete=models.CASCADE, related_name="recipes")
     name = models.CharField(max_length=255)
+    meal_type = models.CharField(max_length=20, choices=MealType.choices)
+    servings = models.PositiveSmallIntegerField(default=4, help_text="Number of people it feeds")
     instructions = models.TextField(blank=True)
-    servings = models.PositiveSmallIntegerField(default=4)
+    source_url = models.URLField(blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
     )
@@ -19,6 +28,29 @@ class Recipe(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class RecipeIngredient(models.Model):
+    """One ingredient line within a Recipe, optionally linked to a catalog GroceryItem."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name="ingredients")
+    name = models.CharField(max_length=255)
+    quantity = models.CharField(max_length=100, blank=True)
+    grocery_item = models.ForeignKey(
+        "catalog.GroceryItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="recipe_ingredients",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{self.quantity} {self.name}".strip()
 
 
 class MealPlan(models.Model):
@@ -39,12 +71,6 @@ class MealPlan(models.Model):
 
 class MealSlot(models.Model):
     """A single meal (e.g. Tuesday dinner) within a MealPlan."""
-
-    class MealType(models.TextChoices):
-        BREAKFAST = "breakfast", "Breakfast"
-        LUNCH = "lunch", "Lunch"
-        DINNER = "dinner", "Dinner"
-        SNACK = "snack", "Snack"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     meal_plan = models.ForeignKey(MealPlan, on_delete=models.CASCADE, related_name="slots")

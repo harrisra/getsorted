@@ -22,7 +22,7 @@ class HouseholdScopedViewSet(viewsets.ModelViewSet):
 
 
 class RecipeViewSet(HouseholdScopedViewSet):
-    queryset = Recipe.objects.all()
+    queryset = Recipe.objects.prefetch_related("ingredients", "ingredients__grocery_item").all()
     serializer_class = RecipeSerializer
 
     def perform_create(self, serializer):

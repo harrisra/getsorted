@@ -1,0 +1,172 @@
+import { useEffect, useState } from 'react'
+import {
+  type Recipe,
+  type RecipeInput,
+  createRecipe,
+  deleteRecipe,
+  fetchRecipes,
+  updateRecipe,
+} from '../api/client'
+import { useHouseholds } from '../households/HouseholdsContext'
+import { RecipeForm } from './RecipeForm'
+
+const MEAL_TYPE_LABELS: Record<Recipe['meal_type'], string> = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+  snack: 'Snack',
+}
+
+export function RecipesPage() {
+  const { currentHousehold } = useHouseholds()
+  const [recipes, setRecipes] = useState<Recipe[] | null>(null)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  async function refresh() {
+    setRecipes(await fetchRecipes())
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  async function handleDelete(id: string) {
+    setDeletingId(id)
+    try {
+      await deleteRecipe(id)
+      await refresh()
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  if (!currentHousehold) return null
+
+  const visibleRecipes = recipes?.filter((r) => r.household === currentHousehold.id) ?? null
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6 p-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-slate-800">Recipes</h1>
+        {!showAddForm && (
+          <button
+            type="button"
+            onClick={() => setShowAddForm(true)}
+            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            Add recipe
+          </button>
+        )}
+      </div>
+
+      {showAddForm && (
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <RecipeForm
+            householdId={currentHousehold.id}
+            submitLabel="Add recipe"
+            onCancel={() => setShowAddForm(false)}
+            onSubmit={async (recipe: RecipeInput) => {
+              await createRecipe(recipe)
+              setShowAddForm(false)
+              await refresh()
+            }}
+          />
+        </div>
+      )}
+
+      {visibleRecipes === null && <p className="text-sm text-slate-400">Loading…</p>}
+      {visibleRecipes !== null && visibleRecipes.length === 0 && (
+        <p className="text-sm text-slate-500">No recipes yet.</p>
+      )}
+
+      <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
+        {visibleRecipes?.map((recipe) =>
+          editingId === recipe.id ? (
+            <li key={recipe.id} className="p-4">
+              <RecipeForm
+                householdId={currentHousehold.id}
+                submitLabel="Save"
+                initialValue={{
+                  name: recipe.name,
+                  meal_type: recipe.meal_type,
+                  servings: recipe.servings,
+                  instructions: recipe.instructions,
+                  source_url: recipe.source_url,
+                  ingredients: recipe.ingredients.map((ing) => ({
+                    name: ing.name,
+                    quantity: ing.quantity,
+                    grocery_item: ing.grocery_item,
+                  })),
+                }}
+                onCancel={() => setEditingId(null)}
+                onSubmit={async (updated) => {
+                  await updateRecipe(recipe.id, updated)
+                  setEditingId(null)
+                  await refresh()
+                }}
+              />
+            </li>
+          ) : (
+            <li key={recipe.id} className="px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-slate-800">{recipe.name}</p>
+                  <p className="text-sm text-slate-500">
+                    {MEAL_TYPE_LABELS[recipe.meal_type]} · Feeds {recipe.servings}
+                    {recipe.source_url && (
+                      <>
+                        {' · '}
+                        <a
+                          href={recipe.source_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          Recipe link
+                        </a>
+                      </>
+                    )}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(recipe.id)}
+                    className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(recipe.id)}
+                    disabled={deletingId === recipe.id}
+                    className="text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
+                  >
+                    {deletingId === recipe.id ? 'Removing…' : 'Remove'}
+                  </button>
+                </div>
+              </div>
+              {recipe.ingredients.length > 0 && (
+                <ul className="mt-2 space-y-0.5 text-sm text-slate-600">
+                  {recipe.ingredients.map((ing) => (
+                    <li key={ing.id}>
+                      {[ing.quantity, ing.name].filter(Boolean).join(' ')}
+                      {ing.grocery_item_detail && (
+                        <span className="text-slate-400">
+                          {' '}
+                          — linked to {ing.grocery_item_detail.store} {ing.grocery_item_detail.name}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ),
+        )}
+      </ul>
+    </div>
+  )
+}

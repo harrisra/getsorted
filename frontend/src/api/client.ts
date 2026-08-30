@@ -209,3 +209,64 @@ export async function populateGroceryItem(
   })
   return response.json()
 }
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+
+export interface GroceryItemRef {
+  id: string
+  store: string
+  name: string
+  image_url: string
+}
+
+export interface RecipeIngredient {
+  id: string
+  name: string
+  quantity: string
+  grocery_item: string | null
+  grocery_item_detail: GroceryItemRef | null
+}
+
+export type RecipeIngredientInput = Omit<RecipeIngredient, 'id' | 'grocery_item_detail'>
+
+export interface Recipe {
+  id: string
+  household: string
+  name: string
+  meal_type: MealType
+  servings: number
+  instructions: string
+  source_url: string
+  ingredients: RecipeIngredient[]
+  created_by: string | null
+  created_at: string
+}
+
+export type RecipeInput = Omit<Recipe, 'id' | 'created_by' | 'created_at' | 'ingredients'> & {
+  ingredients: RecipeIngredientInput[]
+}
+
+export async function fetchRecipes(): Promise<Recipe[]> {
+  const response = await apiFetch('/api/mealplanner/recipes/')
+  return response.json()
+}
+
+export async function createRecipe(recipe: RecipeInput): Promise<Recipe> {
+  const response = await apiFetch('/api/mealplanner/recipes/', {
+    method: 'POST',
+    body: JSON.stringify(recipe),
+  })
+  return response.json()
+}
+
+export async function updateRecipe(id: string, recipe: RecipeInput): Promise<Recipe> {
+  const response = await apiFetch(`/api/mealplanner/recipes/${id}/`, {
+    method: 'PUT',
+    body: JSON.stringify(recipe),
+  })
+  return response.json()
+}
+
+export async function deleteRecipe(id: string): Promise<void> {
+  await apiFetch(`/api/mealplanner/recipes/${id}/`, { method: 'DELETE' })
+}

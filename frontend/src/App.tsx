@@ -8,6 +8,7 @@ import { CreateHouseholdPage } from './households/CreateHouseholdPage'
 import { HouseholdPage } from './households/HouseholdPage'
 import { HouseholdsProvider, useHouseholds } from './households/HouseholdsContext'
 import { Navigation, type NavTab } from './nav/Navigation'
+import { RecipesPage } from './recipes/RecipesPage'
 
 type HealthStatus = 'checking' | 'ok' | 'error'
 
@@ -37,6 +38,7 @@ function Dashboard() {
       {activeTab === 'account' && <AccountPage />}
       {activeTab === 'household' && <HouseholdPage />}
       {activeTab === 'groceries' && <GroceryItemsPage />}
+      {activeTab === 'recipes' && <RecipesPage />}
       <p className="mx-auto max-w-2xl px-8 pb-4 text-xs text-slate-400">
         Backend API:{' '}
         {status === 'checking' && 'checking…'}
