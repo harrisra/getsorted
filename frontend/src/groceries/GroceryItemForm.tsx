@@ -9,6 +9,7 @@ const EMPTY: GroceryItemInput = {
   size: '',
   price: '',
   product_url: '',
+  image_url: '',
 }
 
 export function GroceryItemForm({
@@ -59,6 +60,7 @@ export function GroceryItemForm({
         size: result.size || prev.size,
         price: result.price ?? prev.price,
         product_url: result.product_url || prev.product_url,
+        image_url: result.image_url || prev.image_url,
       }))
       setPopulateMessage(
         result.matched_exact
@@ -154,6 +156,24 @@ export function GroceryItemForm({
           value={values.price ?? ''}
           onChange={(v) => set('price', v)}
         />
+        <div className="col-span-2 flex items-end gap-3">
+          <div className="flex-1">
+            <Field
+              label="Image URL"
+              type="url"
+              placeholder="https://…"
+              value={values.image_url}
+              onChange={(v) => set('image_url', v)}
+            />
+          </div>
+          {values.image_url && (
+            <img
+              src={values.image_url}
+              alt=""
+              className="h-10 w-10 shrink-0 rounded border border-slate-200 object-cover"
+            />
+          )}
+        </div>
       </div>
 
       <div className="flex gap-2">

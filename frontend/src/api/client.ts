@@ -150,6 +150,7 @@ export interface GroceryItem {
   size: string
   price: string | null
   product_url: string
+  image_url: string
   created_by_email: string | null
   created_at: string
   updated_at: string
@@ -194,6 +195,7 @@ export interface PopulateResult {
   size: string
   price: string | null
   product_url: string
+  image_url: string
   matched_exact: boolean
 }
 

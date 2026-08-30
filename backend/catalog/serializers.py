@@ -16,6 +16,7 @@ class GroceryItemSerializer(serializers.ModelSerializer):
             "size",
             "price",
             "product_url",
+            "image_url",
             "created_by_email",
             "created_at",
             "updated_at",

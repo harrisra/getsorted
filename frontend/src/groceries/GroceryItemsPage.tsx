@@ -80,6 +80,7 @@ export function GroceryItemsPage() {
                   size: item.size,
                   price: item.price,
                   product_url: item.product_url,
+                  image_url: item.image_url,
                 }}
                 onCancel={() => setEditingId(null)}
                 onSubmit={async (updated) => {
@@ -90,28 +91,37 @@ export function GroceryItemsPage() {
               />
             </li>
           ) : (
-            <li key={item.id} className="flex items-center justify-between px-4 py-3">
-              <div>
-                <p className="font-medium text-slate-800">
-                  {item.store} — {item.name}
-                </p>
-                <p className="text-sm text-slate-500">
-                  {[item.brand, item.size].filter(Boolean).join(' · ')}
-                  {item.price && ` · £${item.price}`}
-                  {item.product_url && (
-                    <>
-                      {' · '}
-                      <a
-                        href={item.product_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        Product page
-                      </a>
-                    </>
-                  )}
-                </p>
+            <li key={item.id} className="flex items-center justify-between gap-3 px-4 py-3">
+              <div className="flex items-center gap-3">
+                {item.image_url && (
+                  <img
+                    src={item.image_url}
+                    alt=""
+                    className="h-10 w-10 shrink-0 rounded border border-slate-200 object-cover"
+                  />
+                )}
+                <div>
+                  <p className="font-medium text-slate-800">
+                    {item.store} — {item.name}
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    {[item.brand, item.size].filter(Boolean).join(' · ')}
+                    {item.price && ` · £${item.price}`}
+                    {item.product_url && (
+                      <>
+                        {' · '}
+                        <a
+                          href={item.product_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          Product page
+                        </a>
+                      </>
+                    )}
+                  </p>
+                </div>
               </div>
               <div className="flex shrink-0 gap-3">
                 <button

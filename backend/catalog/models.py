@@ -19,6 +19,7 @@ class GroceryItem(models.Model):
     size = models.CharField(max_length=100, blank=True, help_text="e.g. 120g")
     price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     product_url = models.URLField(blank=True)
+    image_url = models.URLField(blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
     )

@@ -93,6 +93,7 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
                 "size": f"{grams}g" if grams else "",
                 "price": f"{price_pence / 100:.2f}" if price_pence is not None else None,
                 "product_url": product.get("product_id") or product_url,
+                "image_url": product.get("pepesto_hosted_image_url") or product.get("image_url") or "",
                 "matched_exact": exact_match is not None,
             }
         )
