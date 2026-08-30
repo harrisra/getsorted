@@ -54,6 +54,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -108,6 +109,15 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# gunicorn has no built-in static file serving, and there's no separate nginx
+# sidecar in front of it in k3s, so whitenoise serves /static/ (admin CSS/JS,
+# DRF browsable API assets) directly from the app process — compressed and
+# cached, with a manifest so filenames change on content change.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
 
 # --- Email -------------------------------------------------------------------
 # Used by allauth for signup confirmation / password reset emails. Defaults to
