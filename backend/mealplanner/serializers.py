@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.reverse import reverse
 
 from catalog.models import GroceryItem
 from .models import MealPlan, MealSlot, Recipe, RecipeIngredient, ShoppingListItem
@@ -21,6 +22,7 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
 class RecipeSerializer(serializers.ModelSerializer):
     ingredients = RecipeIngredientSerializer(many=True, required=False)
     current_cost = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
@@ -38,11 +40,16 @@ class RecipeSerializer(serializers.ModelSerializer):
             "created_by",
             "created_at",
         ]
-        read_only_fields = ["image", "created_by", "created_at"]
+        read_only_fields = ["created_by", "created_at"]
 
     def get_current_cost(self, recipe):
         cost = recipe.current_cost
         return str(cost) if cost is not None else None
+
+    def get_image(self, recipe):
+        if not recipe.image_data:
+            return None
+        return reverse("recipe-image", kwargs={"pk": recipe.pk}, request=self.context.get("request"))
 
     def create(self, validated_data):
         ingredients_data = validated_data.pop("ingredients", [])

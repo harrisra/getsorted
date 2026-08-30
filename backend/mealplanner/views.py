@@ -1,7 +1,9 @@
+import io
 from datetime import date, timedelta
 from itertools import product
 
-from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import Http404, HttpResponse
+from PIL import Image, UnidentifiedImageError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -11,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.models import Household
-from .models import MealPlan, MealSlot, MealType, Recipe, ShoppingListItem
+from .models import MAX_RECIPE_IMAGE_MB, MealPlan, MealSlot, MealType, Recipe, ShoppingListItem
 from .permissions import IsHouseholdMember
 from .serializers import (
     MealPlanSerializer,
@@ -40,28 +42,43 @@ class RecipeViewSet(HouseholdScopedViewSet):
 
     @action(
         detail=True,
-        methods=["put", "delete"],
+        methods=["get", "put", "delete"],
         url_path="image",
         parser_classes=[MultiPartParser, FormParser],
     )
     def image(self, request, pk=None):
         recipe = self.get_object()
 
+        if request.method == "GET":
+            if not recipe.image_data:
+                raise Http404
+            return HttpResponse(bytes(recipe.image_data), content_type=recipe.image_content_type)
+
         if request.method == "DELETE":
-            recipe.image.delete(save=True)
+            recipe.image_data = None
+            recipe.image_content_type = ""
+            recipe.save(update_fields=["image_data", "image_content_type"])
             return Response(status=status.HTTP_204_NO_CONTENT)
 
         file = request.data.get("image")
         if not file:
             raise ValidationError({"image": ["No file provided."]})
+        if file.size > MAX_RECIPE_IMAGE_MB * 1024 * 1024:
+            raise ValidationError(
+                {"image": [f"Image must be smaller than {MAX_RECIPE_IMAGE_MB}MB."]}
+            )
 
-        recipe.image.delete(save=False)
-        recipe.image = file
+        data = file.read()
         try:
-            recipe.full_clean(validate_unique=False)
-        except DjangoValidationError as exc:
-            raise ValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages)
-        recipe.save()
+            img = Image.open(io.BytesIO(data))
+            img.verify()
+        except UnidentifiedImageError as exc:
+            raise ValidationError({"image": ["Not a valid image file."]}) from exc
+        content_type = Image.MIME.get(img.format, file.content_type or "application/octet-stream")
+
+        recipe.image_data = data
+        recipe.image_content_type = content_type
+        recipe.save(update_fields=["image_data", "image_content_type"])
         return Response(self.get_serializer(recipe).data)
 
 

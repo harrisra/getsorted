@@ -100,12 +100,6 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# User-uploaded content (e.g. recipe images). Served from local disk in dev;
-# production will need real object storage since container filesystems are
-# ephemeral — not yet configured, flagged as a follow-up.
-MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
-
 # --- Email -------------------------------------------------------------------
 # Used by allauth for signup confirmation / password reset emails. Defaults to
 # printing to the console so local dev doesn't need real SMTP credentials.
