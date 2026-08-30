@@ -9,7 +9,9 @@ import {
   updateRecipe,
   uploadRecipeImage,
 } from '../api/client'
+import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { useHouseholds } from '../households/HouseholdsContext'
+import { PencilIcon } from '../icons'
 import { RecipeForm } from './RecipeForm'
 
 const MEAL_TYPE_LABELS: Record<Recipe['meal_type'], string> = {
@@ -28,7 +30,6 @@ export function RecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[] | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function refresh() {
     setRecipes(await fetchRecipes())
@@ -39,13 +40,8 @@ export function RecipesPage() {
   }, [])
 
   async function handleDelete(id: string) {
-    setDeletingId(id)
-    try {
-      await deleteRecipe(id)
-      await refresh()
-    } finally {
-      setDeletingId(null)
-    }
+    await deleteRecipe(id)
+    await refresh()
   }
 
   if (!currentHousehold) return null
@@ -171,36 +167,18 @@ export function RecipesPage() {
                   <button
                     type="button"
                     onClick={() => setEditingId(recipe.id)}
-                    className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                    title="Edit"
+                    aria-label="Edit"
+                    className="text-slate-500 hover:text-slate-900"
                   >
-                    Edit
+                    <PencilIcon className="h-4 w-4" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(recipe.id)}
-                    disabled={deletingId === recipe.id}
-                    className="text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
-                  >
-                    {deletingId === recipe.id ? 'Removing…' : 'Remove'}
-                  </button>
+                  <ConfirmDeleteButton
+                    label="Remove recipe"
+                    onConfirm={() => handleDelete(recipe.id)}
+                  />
                 </div>
               </div>
-              {recipe.ingredients.length > 0 && (
-                <ul className="mt-2 space-y-0.5 text-sm text-slate-600">
-                  {recipe.ingredients.map((ing) => (
-                    <li key={ing.id}>
-                      {[ing.quantity, ing.name].filter(Boolean).join(' ')}
-                      {ing.grocery_item_detail && (
-                        <span className="text-slate-400">
-                          {' '}
-                          — linked to {ing.grocery_item_detail.store} {ing.grocery_item_detail.name}
-                          {ing.grocery_item_detail.price && ` (£${ing.grocery_item_detail.price})`}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
             </li>
           ),
         )}

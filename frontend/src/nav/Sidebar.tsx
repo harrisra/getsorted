@@ -10,7 +10,7 @@ import {
   HomeIcon,
   LogoutIcon,
   UserIcon,
-} from './icons'
+} from '../icons'
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'getsorted:sidebarCollapsed'
 

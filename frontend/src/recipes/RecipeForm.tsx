@@ -8,6 +8,7 @@ import {
   type RecipeInput,
   fetchGroceryItems,
 } from '../api/client'
+import { TrashIcon } from '../icons'
 import { GroceryItemCombobox } from './GroceryItemCombobox'
 
 type RecipeFormValues = Omit<RecipeInput, 'household'>
@@ -214,9 +215,11 @@ export function RecipeForm({
                 type="button"
                 onClick={handleRemoveImage}
                 disabled={removingImage}
-                className="shrink-0 text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
+                title={removingImage ? 'Removing…' : 'Remove photo'}
+                aria-label={removingImage ? 'Removing…' : 'Remove photo'}
+                className="shrink-0 text-red-500 hover:text-red-700 disabled:opacity-50"
               >
-                {removingImage ? 'Removing…' : 'Remove'}
+                <TrashIcon className="h-4 w-4" />
               </button>
             )}
           </div>
@@ -253,9 +256,11 @@ export function RecipeForm({
               <button
                 type="button"
                 onClick={() => removeIngredient(index)}
-                className="shrink-0 text-xs font-medium text-red-600 hover:text-red-800"
+                title="Remove"
+                aria-label="Remove ingredient"
+                className="shrink-0 text-red-500 hover:text-red-700"
               >
-                Remove
+                <TrashIcon className="h-4 w-4" />
               </button>
             </div>
           ))}

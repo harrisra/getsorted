@@ -8,6 +8,7 @@ import {
   fetchMembers,
   removeMember,
 } from '../api/client'
+import { TrashIcon } from '../icons'
 
 export function HouseholdMembers({ household }: { household: Household }) {
   const [members, setMembers] = useState<Membership[] | null>(null)
@@ -72,9 +73,11 @@ export function HouseholdMembers({ household }: { household: Household }) {
                 type="button"
                 onClick={() => handleRemove(member.user_id)}
                 disabled={removingId === member.user_id}
-                className="text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
+                title={removingId === member.user_id ? 'Removing…' : 'Remove'}
+                aria-label={removingId === member.user_id ? 'Removing…' : 'Remove'}
+                className="text-red-500 hover:text-red-700 disabled:opacity-50"
               >
-                {removingId === member.user_id ? 'Removing…' : 'Remove'}
+                <TrashIcon className="h-4 w-4" />
               </button>
             )}
           </li>

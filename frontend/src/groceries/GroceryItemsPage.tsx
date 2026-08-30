@@ -7,13 +7,14 @@ import {
   fetchGroceryItems,
   updateGroceryItem,
 } from '../api/client'
+import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
+import { PencilIcon } from '../icons'
 import { GroceryItemForm } from './GroceryItemForm'
 
 export function GroceryItemsPage() {
   const [items, setItems] = useState<GroceryItem[] | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function refresh() {
     setItems(await fetchGroceryItems())
@@ -24,13 +25,8 @@ export function GroceryItemsPage() {
   }, [])
 
   async function handleDelete(id: string) {
-    setDeletingId(id)
-    try {
-      await deleteGroceryItem(id)
-      await refresh()
-    } finally {
-      setDeletingId(null)
-    }
+    await deleteGroceryItem(id)
+    await refresh()
   }
 
   return (
@@ -130,18 +126,16 @@ export function GroceryItemsPage() {
                 <button
                   type="button"
                   onClick={() => setEditingId(item.id)}
-                  className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                  title="Edit"
+                  aria-label="Edit"
+                  className="text-slate-500 hover:text-slate-900"
                 >
-                  Edit
+                  <PencilIcon className="h-4 w-4" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(item.id)}
-                  disabled={deletingId === item.id}
-                  className="text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
-                >
-                  {deletingId === item.id ? 'Removing…' : 'Remove'}
-                </button>
+                <ConfirmDeleteButton
+                  label="Remove grocery item"
+                  onConfirm={() => handleDelete(item.id)}
+                />
               </div>
             </li>
           ),
