@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { API_BASE_URL } from './api/client'
+import { AccountPage } from './account/AccountPage'
 import { AuthPage } from './auth/AuthPage'
 import { useAuth } from './auth/AuthContext'
 import { CreateHouseholdPage } from './households/CreateHouseholdPage'
+import { HouseholdPage } from './households/HouseholdPage'
 import { HouseholdsProvider, useHouseholds } from './households/HouseholdsContext'
+import { Navigation, type NavTab } from './nav/Navigation'
 
 type HealthStatus = 'checking' | 'ok' | 'error'
 
@@ -24,33 +27,20 @@ function useHealthStatus(): HealthStatus {
 }
 
 function Dashboard() {
-  const { user, logout } = useAuth()
-  const { households } = useHouseholds()
+  const [activeTab, setActiveTab] = useState<NavTab>('account')
   const status = useHealthStatus()
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
-      <div className="space-y-4 text-center">
-        <h1 className="text-3xl font-semibold text-slate-800">GetSorted</h1>
-        <p className="text-slate-600">Signed in as {user?.email}</p>
-        <p className="text-slate-600">
-          Household{households.length > 1 ? 's' : ''}:{' '}
-          {households.map((h) => h.name).join(', ')}
-        </p>
-        <p className="text-slate-500">
-          Backend API:{' '}
-          {status === 'checking' && 'checking…'}
-          {status === 'ok' && <span className="text-green-600">connected</span>}
-          {status === 'error' && <span className="text-red-600">unreachable</span>}
-        </p>
-        <button
-          type="button"
-          onClick={() => logout()}
-          className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-        >
-          Log out
-        </button>
-      </div>
+    <div className="min-h-screen bg-slate-50">
+      <Navigation activeTab={activeTab} onSelectTab={setActiveTab} />
+      {activeTab === 'account' && <AccountPage />}
+      {activeTab === 'household' && <HouseholdPage />}
+      <p className="mx-auto max-w-2xl px-8 pb-4 text-xs text-slate-400">
+        Backend API:{' '}
+        {status === 'checking' && 'checking…'}
+        {status === 'ok' && <span className="text-green-600">connected</span>}
+        {status === 'error' && <span className="text-red-600">unreachable</span>}
+      </p>
     </div>
   )
 }
