@@ -13,6 +13,7 @@ import {
 import { useHouseholds } from '../households/HouseholdsContext'
 import { addDays, currentWeekStart, formatDateISO, formatDayHeading, parseDateISO } from './dates'
 import { DraggableRecipeCard } from './DraggableRecipeCard'
+import { FilterSortPills, type RecipeSortBy } from './FilterSortPills'
 import { MealSlotCell } from './MealSlotCell'
 import { RecipeCardContent } from './RecipeCardContent'
 
@@ -30,6 +31,8 @@ export function MealPlannerPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [error, setError] = useState<string | null>(null)
   const [activeRecipeId, setActiveRecipeId] = useState<string | null>(null)
+  const [mealTypeFilter, setMealTypeFilter] = useState<MealType | null>(null)
+  const [sortBy, setSortBy] = useState<RecipeSortBy | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -64,6 +67,18 @@ export function MealPlannerPage() {
   )
   const householdRecipes = recipes.filter((r) => r.household === household.id)
   const activeRecipe = householdRecipes.find((r) => r.id === activeRecipeId) ?? null
+
+  const displayedRecipes = householdRecipes
+    .filter((r) => !mealTypeFilter || r.meal_type === mealTypeFilter)
+    .sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      if (sortBy === 'price') {
+        const priceA = a.current_cost ? Number(a.current_cost) : Infinity
+        const priceB = b.current_cost ? Number(b.current_cost) : Infinity
+        return priceA - priceB
+      }
+      return 0
+    })
 
   function goToWeek(offsetWeeks: number) {
     setWeekStart((prev) =>
@@ -200,10 +215,22 @@ export function MealPlannerPage() {
             <span className="text-sm font-medium text-slate-600">
               Drag a recipe onto a cell to add it
             </span>
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {householdRecipes.map((recipe) => (
-                <DraggableRecipeCard key={recipe.id} recipe={recipe} />
-              ))}
+            <div className="flex gap-3">
+              <FilterSortPills
+                mealTypes={MEAL_TYPES}
+                mealTypeFilter={mealTypeFilter}
+                onMealTypeFilterChange={setMealTypeFilter}
+                sortBy={sortBy}
+                onSortByChange={setSortBy}
+              />
+              <div className="flex flex-1 gap-3 overflow-x-auto pb-2">
+                {displayedRecipes.length === 0 && (
+                  <p className="self-center text-sm text-slate-400">No recipes match.</p>
+                )}
+                {displayedRecipes.map((recipe) => (
+                  <DraggableRecipeCard key={recipe.id} recipe={recipe} />
+                ))}
+              </div>
             </div>
           </div>
         )}
