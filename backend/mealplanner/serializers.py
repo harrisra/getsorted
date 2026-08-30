@@ -19,7 +19,14 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "quantity", "grocery_item", "grocery_item_detail"]
 
 
-class RecipeSerializer(serializers.ModelSerializer):
+class RecipeImageMixin:
+    def get_image(self, recipe):
+        if not recipe.image_data:
+            return None
+        return reverse("recipe-image", kwargs={"pk": recipe.pk}, request=self.context.get("request"))
+
+
+class RecipeSerializer(RecipeImageMixin, serializers.ModelSerializer):
     ingredients = RecipeIngredientSerializer(many=True, required=False)
     current_cost = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
@@ -46,11 +53,6 @@ class RecipeSerializer(serializers.ModelSerializer):
         cost = recipe.current_cost
         return str(cost) if cost is not None else None
 
-    def get_image(self, recipe):
-        if not recipe.image_data:
-            return None
-        return reverse("recipe-image", kwargs={"pk": recipe.pk}, request=self.context.get("request"))
-
     def create(self, validated_data):
         ingredients_data = validated_data.pop("ingredients", [])
         recipe = super().create(validated_data)
@@ -71,12 +73,13 @@ class RecipeSerializer(serializers.ModelSerializer):
         )
 
 
-class RecipeSummarySerializer(serializers.ModelSerializer):
+class RecipeSummarySerializer(RecipeImageMixin, serializers.ModelSerializer):
     current_cost = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
-        fields = ["id", "name", "meal_type", "servings", "current_cost"]
+        fields = ["id", "name", "meal_type", "servings", "current_cost", "image"]
 
     def get_current_cost(self, recipe):
         cost = recipe.current_cost

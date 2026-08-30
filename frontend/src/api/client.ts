@@ -312,6 +312,7 @@ export interface RecipeSummary {
   meal_type: MealType
   servings: number
   current_cost: string | null
+  image: string | null
 }
 
 export interface MealSlot {

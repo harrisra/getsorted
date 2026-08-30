@@ -153,11 +153,27 @@ export function MealPlannerPage() {
                       {slot.recipes_detail.map((r) => (
                         <div
                           key={r.id}
-                          className="flex items-center justify-between gap-1 rounded bg-slate-100 px-1.5 py-1 text-xs"
+                          className="flex items-start justify-between gap-1 rounded bg-slate-100 px-1.5 py-1.5 text-xs"
                         >
-                          <span className="truncate" title={r.name}>
-                            {r.name}
-                            {r.current_cost && ` — £${r.current_cost}`}
+                          <span className="flex min-w-0 items-start gap-1.5">
+                            {r.image && (
+                              <img
+                                src={r.image}
+                                alt=""
+                                className="h-10 w-10 shrink-0 rounded object-cover"
+                              />
+                            )}
+                            <span className="inline-flex flex-wrap items-center gap-1">
+                              <span>{r.name}</span>
+                              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                                Feeds {r.servings}
+                              </span>
+                              {r.current_cost && (
+                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                                  £{r.current_cost}
+                                </span>
+                              )}
+                            </span>
                           </span>
                           <button
                             type="button"
