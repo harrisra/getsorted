@@ -247,9 +247,13 @@ export interface RecipeIngredient {
   milliliters: number | null
   grocery_item: string | null
   grocery_item_detail: GroceryItemRef | null
+  line_cost: string | null
 }
 
-export type RecipeIngredientInput = Omit<RecipeIngredient, 'id' | 'grocery_item_detail'>
+export type RecipeIngredientInput = Omit<
+  RecipeIngredient,
+  'id' | 'grocery_item_detail' | 'line_cost'
+>
 
 export interface Recipe {
   id: string

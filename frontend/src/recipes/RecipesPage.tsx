@@ -22,7 +22,7 @@ const MEAL_TYPE_LABELS: Record<Recipe['meal_type'], string> = {
 }
 
 function pricedIngredientCount(recipe: Recipe): number {
-  return recipe.ingredients.filter((ing) => ing.grocery_item_detail?.price != null).length
+  return recipe.ingredients.filter((ing) => ing.line_cost != null).length
 }
 
 export function RecipesPage() {

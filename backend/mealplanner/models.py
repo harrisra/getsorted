@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -46,16 +47,16 @@ class Recipe(models.Model):
 
     @property
     def current_cost(self):
-        """Sum of the current catalog price of each linked, priced ingredient.
+        """Sum of each ingredient's proportional line_cost.
 
         None (rather than 0) when nothing is priced, so "no data" isn't
         confused with "free". Shared by RecipeSerializer and MealPlan's
         day/week cost totals so the calculation lives in exactly one place.
         """
         prices = [
-            ingredient.grocery_item.price
+            ingredient.line_cost
             for ingredient in self.ingredients.all()
-            if ingredient.grocery_item_id and ingredient.grocery_item.price is not None
+            if ingredient.line_cost is not None
         ]
         return sum(prices) if prices else None
 
@@ -94,6 +95,27 @@ class RecipeIngredient(models.Model):
             if part
         )
         return f"{amount} {self.name}".strip()
+
+    @property
+    def line_cost(self):
+        """This ingredient's share of its linked grocery item's price.
+
+        Scaled by whichever unit (grams/milliliters/pieces) both this
+        ingredient and the linked item have in common — e.g. needing 250g of
+        a 500g, £2 pack costs £1. None if there's no link, no price, or no
+        shared unit to scale by (rather than guessing, or falling back to
+        the item's full price, which would silently overstate the cost).
+        """
+        item = self.grocery_item
+        if not item or item.price is None:
+            return None
+        for dimension in ("grams", "milliliters", "pieces"):
+            item_amount = getattr(item, dimension)
+            ingredient_amount = getattr(self, dimension)
+            if item_amount and ingredient_amount is not None:
+                cost = item.price * (Decimal(ingredient_amount) / Decimal(item_amount))
+                return cost.quantize(Decimal("0.01"))
+        return None
 
 
 class MealPlan(models.Model):

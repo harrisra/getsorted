@@ -13,10 +13,24 @@ class GroceryItemSummarySerializer(serializers.ModelSerializer):
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
     grocery_item_detail = GroceryItemSummarySerializer(source="grocery_item", read_only=True)
+    line_cost = serializers.SerializerMethodField()
 
     class Meta:
         model = RecipeIngredient
-        fields = ["id", "name", "grams", "pieces", "milliliters", "grocery_item", "grocery_item_detail"]
+        fields = [
+            "id",
+            "name",
+            "grams",
+            "pieces",
+            "milliliters",
+            "grocery_item",
+            "grocery_item_detail",
+            "line_cost",
+        ]
+
+    def get_line_cost(self, ingredient):
+        cost = ingredient.line_cost
+        return str(cost) if cost is not None else None
 
     def validate(self, attrs):
         def value(field):
