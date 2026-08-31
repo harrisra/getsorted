@@ -141,7 +141,7 @@ export interface Household {
   name: string
   week_start_day: number
   created_at: string
-  role: 'admin' | 'member'
+  role: 'owner' | 'member'
 }
 
 export async function fetchHouseholds(): Promise<Household[]> {
@@ -175,7 +175,7 @@ export async function deleteHousehold(householdId: string): Promise<void> {
 export interface Membership {
   user_id: string
   email: string
-  role: 'admin' | 'member'
+  role: 'owner' | 'member'
   joined_at: string
 }
 

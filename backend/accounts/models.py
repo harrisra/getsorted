@@ -63,7 +63,7 @@ class Membership(models.Model):
     """A user's membership of a household, with a role within it."""
 
     class Role(models.TextChoices):
-        ADMIN = "admin", "Admin"
+        OWNER = "owner", "Owner"
         MEMBER = "member", "Member"
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)

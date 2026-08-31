@@ -17,7 +17,7 @@ export function HouseholdMembers({ household }: { household: Household }) {
   const [submitting, setSubmitting] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
-  const isAdmin = household.role === 'admin'
+  const isOwner = household.role === 'owner'
 
   async function refresh() {
     setMembers(await fetchMembers(household.id))
@@ -68,7 +68,7 @@ export function HouseholdMembers({ household }: { household: Household }) {
               <span className="text-sm text-slate-800">{member.email}</span>{' '}
               <span className="text-xs capitalize text-slate-500">({member.role})</span>
             </div>
-            {isAdmin && (
+            {isOwner && (
               <button
                 type="button"
                 onClick={() => handleRemove(member.user_id)}
@@ -92,7 +92,7 @@ export function HouseholdMembers({ household }: { household: Household }) {
         </ul>
       )}
 
-      {isAdmin && (
+      {isOwner && (
         <form onSubmit={handleAdd} className="flex gap-2">
           <input
             type="email"

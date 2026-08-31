@@ -22,7 +22,7 @@ class HouseholdSerializer(serializers.ModelSerializer):
         Membership.objects.create(
             user=self.context["request"].user,
             household=household,
-            role=Membership.Role.ADMIN,
+            role=Membership.Role.OWNER,
         )
         return household
 

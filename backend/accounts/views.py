@@ -25,7 +25,7 @@ class HouseholdViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    """List/create households for the current user; creator becomes its admin."""
+    """List/create households for the current user; creator becomes its owner."""
 
     serializer_class = HouseholdSerializer
     permission_classes = [IsAuthenticated]
@@ -34,29 +34,29 @@ class HouseholdViewSet(
         return Household.objects.filter(members=self.request.user).order_by("name")
 
     def perform_update(self, serializer):
-        self._require_admin(serializer.instance)
+        self._require_owner(serializer.instance)
         serializer.save()
 
     def perform_destroy(self, instance):
         # Cascades to the household's memberships and all its domain data
         # (recipes, meal plans, shopping list items) — a user is allowed to
         # end up in zero households, they just lose access to that data.
-        self._require_admin(instance)
+        self._require_owner(instance)
         instance.delete()
 
-    def _require_admin(self, household: Household) -> None:
-        is_admin = Membership.objects.filter(
-            household=household, user=self.request.user, role=Membership.Role.ADMIN
+    def _require_owner(self, household: Household) -> None:
+        is_owner = Membership.objects.filter(
+            household=household, user=self.request.user, role=Membership.Role.OWNER
         ).exists()
-        if not is_admin:
-            raise PermissionDenied("Only a household admin can do this.")
+        if not is_owner:
+            raise PermissionDenied("Only a household owner can do this.")
 
     @action(detail=True, methods=["get", "post"], url_path="members")
     def members(self, request, pk=None):
         household = self.get_object()
 
         if request.method == "POST":
-            self._require_admin(household)
+            self._require_owner(household)
             serializer = AddMemberSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             user = User.objects.get(email__iexact=serializer.validated_data["email"])
@@ -83,18 +83,18 @@ class HouseholdViewSet(
     )
     def remove_member(self, request, pk=None, member_id=None):
         household = self.get_object()
-        self._require_admin(household)
+        self._require_owner(household)
         membership = get_object_or_404(Membership, household=household, user_id=member_id)
 
-        is_last_admin = (
-            membership.role == Membership.Role.ADMIN
+        is_last_owner = (
+            membership.role == Membership.Role.OWNER
             and Membership.objects.filter(
-                household=household, role=Membership.Role.ADMIN
+                household=household, role=Membership.Role.OWNER
             ).count()
             <= 1
         )
-        if is_last_admin:
-            raise ValidationError({"detail": "A household must keep at least one admin."})
+        if is_last_owner:
+            raise ValidationError({"detail": "A household must keep at least one owner."})
 
         membership.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

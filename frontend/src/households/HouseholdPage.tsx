@@ -19,7 +19,7 @@ function WeekStartSetting({ household }: { household: Household }) {
   const { refreshHouseholds } = useHouseholds()
   const [saving, setSaving] = useState(false)
 
-  if (household.role !== 'admin') {
+  if (household.role !== 'owner') {
     return (
       <p className="text-xs text-slate-400">
         Meal planner week starts on {WEEKDAYS[household.week_start_day]}.
@@ -79,7 +79,7 @@ export function HouseholdPage() {
               <span className="font-medium text-slate-800">{household.name}</span>
               <div className="flex items-center gap-3">
                 <span className="text-sm capitalize text-slate-500">{household.role}</span>
-                {household.role === 'admin' && (
+                {household.role === 'owner' && (
                   <ConfirmDeleteButton
                     label="Delete household"
                     onConfirm={() => deleteHousehold(household.id)}
