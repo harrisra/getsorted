@@ -6,10 +6,12 @@ import {
   type GroceryItem,
   type ShoppingList,
   type ShoppingListItem,
+  type Store,
   createShoppingListItem,
   deleteShoppingListItem,
   fetchGroceryItems,
   fetchShoppingListItems,
+  fetchStores,
   generateShoppingList,
   renameShoppingList,
   updateShoppingListItem,
@@ -51,6 +53,14 @@ function formatAmount(item: ShoppingListItem): string | null {
 function parseAmount(value: string): number | null {
   const n = Number(value)
   return value.trim() !== '' && Number.isFinite(n) && n > 0 ? Math.trunc(n) : null
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 // Background/border classes for the product dropdown: pale green when the
@@ -195,6 +205,11 @@ export function ShoppingListDetailView({
   const [nameInput, setNameInput] = useState(list.name)
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
+  const [stores, setStores] = useState<Store[]>([])
+  const [catalogSearch, setCatalogSearch] = useState('')
+  const [catalogStoreFilter, setCatalogStoreFilter] = useState('')
+  const [addingCatalogItemId, setAddingCatalogItemId] = useState<string | null>(null)
+  const [catalogAddError, setCatalogAddError] = useState<string | null>(null)
 
   async function refresh() {
     setItems(await fetchShoppingListItems())
@@ -203,6 +218,7 @@ export function ShoppingListDetailView({
   useEffect(() => {
     refresh()
     fetchGroceryItems().then(setGroceryItems)
+    fetchStores().then(setStores)
   }, [])
 
   const visibleItems = items?.filter((item) => item.shopping_list === list.id) ?? null
@@ -211,6 +227,21 @@ export function ShoppingListDetailView({
   // than treating "unknown" as £0.
   const totalCost = visibleItems?.reduce((sum, item) => sum + (rowCost(item) ?? 0), 0) ?? 0
   const sortedItems = visibleItems ? sortEnriched(enrichItems(visibleItems, groceryItems), sortMode) : null
+
+  // Grocery catalog items shown in the "Add from grocery items" panel —
+  // free-text search over name/brand plus an optional store filter, same
+  // filtering shape as the main grocery items page.
+  const trimmedCatalogSearch = catalogSearch.trim().toLowerCase()
+  const catalogResults = groceryItems.filter((gi) => {
+    if (catalogStoreFilter && gi.store !== catalogStoreFilter) return false
+    if (
+      trimmedCatalogSearch &&
+      !`${gi.name} ${gi.brand}`.toLowerCase().includes(trimmedCatalogSearch)
+    ) {
+      return false
+    }
+    return true
+  })
 
   // Today through the next 6 days — the window generation can draw from.
   const next7Days = Array.from({ length: 7 }, (_, i) => formatDateISO(addDays(new Date(), i)))
@@ -326,57 +357,112 @@ export function ShoppingListDetailView({
     }
   }
 
+  async function handleAddFromCatalog(groceryItem: GroceryItem) {
+    setCatalogAddError(null)
+    setAddingCatalogItemId(groceryItem.id)
+    try {
+      // Defaults the amount needed to one pack of the item itself (whichever
+      // size dimension it has set), so it shows up with packs_needed = 1
+      // straight away rather than needing grams/pieces/milliliters filled in
+      // by hand — merges into an existing same-named item as usual if there
+      // is one.
+      await createShoppingListItem({
+        shopping_list: list.id,
+        meal_plan: null,
+        name: groceryItem.name,
+        grams: groceryItem.grams,
+        pieces: groceryItem.pieces,
+        milliliters: groceryItem.milliliters,
+        grocery_item: groceryItem.id,
+        is_checked: false,
+      })
+      await refresh()
+    } catch (err) {
+      setCatalogAddError(
+        err instanceof ApiError
+          ? Object.values(err.fieldErrors).flat().join(' ')
+          : 'Could not add that item. Please try again.',
+      )
+    } finally {
+      setAddingCatalogItemId(null)
+    }
+  }
+
+  function handlePrint() {
+    if (!sortedItems || sortedItems.length === 0) return
+
+    const rows: string[] = []
+    let lastHeading: string | null | undefined
+    for (const { item, effectiveStore, effectiveAisleLabel } of sortedItems) {
+      const heading = groupHeading(sortMode, effectiveStore, effectiveAisleLabel)
+      if (heading !== null && heading !== lastHeading) {
+        rows.push(`<h2>${escapeHtml(heading)}</h2>`)
+        lastHeading = heading
+      }
+      const detail = item.packs_needed != null ? `× ${item.packs_needed}` : (formatAmount(item) ?? '')
+      rows.push(`
+        <div class="item${item.is_checked ? ' checked' : ''}">
+          <span class="box"></span>
+          <span class="name">${escapeHtml(item.name)}</span>
+          <span class="detail">${escapeHtml(detail)}</span>
+        </div>
+      `)
+    }
+
+    const printWindow = window.open('', '_blank', 'width=800,height=640')
+    if (!printWindow) return
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${escapeHtml(list.name)}</title>
+          <style>
+            body { font-family: system-ui, sans-serif; padding: 1.5rem; color: #1e293b; }
+            h1 { font-size: 1.25rem; margin: 0 0 1rem; }
+            .columns { column-count: 2; column-gap: 2rem; }
+            /* Spacing above a heading is padding, not margin — a margin
+               here gets dropped when the heading happens to land at the
+               very top of the second column (fragmentation start), which
+               made that column's items start higher than the first
+               column's. Padding doesn't get that treatment, so both
+               columns line up at the same top edge either way. */
+            h2 {
+              font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+              color: #64748b; margin: 0; padding: 1rem 0 0.25rem; border-bottom: 1px solid #e2e8f0;
+              break-inside: avoid;
+            }
+            .columns > *:first-child { padding-top: 0; }
+            .item {
+              display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0;
+              border-bottom: 1px solid #f1f5f9;
+              break-inside: avoid;
+            }
+            .box {
+              width: 0.85rem; height: 0.85rem; border: 1px solid #94a3b8; border-radius: 2px;
+              flex-shrink: 0;
+            }
+            .name { flex: 1; }
+            .detail { color: #64748b; font-size: 0.85rem; }
+            .item.checked .name { text-decoration: line-through; color: #94a3b8; }
+            @media print {
+              body { padding: 0; }
+              .columns { column-count: 2; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${escapeHtml(list.name)}</h1>
+          <div class="columns">${rows.join('')}</div>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
+
   return (
     <div className="space-y-6">
-      <button
-        type="button"
-        onClick={onBack}
-        className="text-sm font-medium text-slate-600 hover:text-slate-900"
-      >
-        ← Back to shopping lists
-      </button>
-      {editingName ? (
-        <form onSubmit={handleRename} className="flex items-center gap-2">
-          <input
-            type="text"
-            autoFocus
-            required
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-xl font-semibold text-slate-800 focus:border-slate-500 focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={renaming}
-            className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-          >
-            {renaming ? 'Saving…' : 'Save'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditingName(false)}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-          >
-            Cancel
-          </button>
-        </form>
-      ) : (
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold text-slate-800">{list.name}</h1>
-          <button
-            type="button"
-            onClick={startEditingName}
-            title="Rename list"
-            aria-label="Rename list"
-            className="text-slate-500 hover:text-slate-900"
-          >
-            <PencilIcon className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-      {renameError && <p className="text-sm text-red-600">{renameError}</p>}
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[20rem_1fr] lg:items-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[30rem_1fr] lg:items-start">
         {/* Left panel: building the list, rather than looking at it. */}
         <div className="space-y-6">
           <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
@@ -458,33 +544,170 @@ export function ShoppingListDetailView({
             </form>
             {addError && <p className="text-sm text-red-600">{addError}</p>}
           </div>
+
+          <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+            <span className="text-sm font-medium text-slate-700">Add from grocery items</span>
+            <input
+              type="search"
+              placeholder="Search grocery items…"
+              value={catalogSearch}
+              onChange={(e) => setCatalogSearch(e.target.value)}
+              aria-label="Search grocery items to add"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            />
+            <select
+              value={catalogStoreFilter}
+              onChange={(e) => setCatalogStoreFilter(e.target.value)}
+              aria-label="Filter grocery items by store"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-slate-500 focus:outline-none"
+            >
+              <option value="">All stores</option>
+              {stores.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {store.name}
+                </option>
+              ))}
+            </select>
+
+            {catalogAddError && <p className="text-sm text-red-600">{catalogAddError}</p>}
+
+            <ul className="max-h-72 divide-y divide-slate-200 overflow-y-auto rounded-md border border-slate-200">
+              {catalogResults.length === 0 && (
+                <li className="px-3 py-3 text-sm text-slate-400">
+                  {trimmedCatalogSearch || catalogStoreFilter
+                    ? 'No grocery items match.'
+                    : 'Search for a grocery item to add it.'}
+                </li>
+              )}
+              {catalogResults.map((gi) => (
+                <li key={gi.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    {gi.image_url && (
+                      <img
+                        src={gi.image_url}
+                        alt=""
+                        className="h-8 w-8 shrink-0 rounded border border-slate-200 object-cover"
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-slate-800">{gi.name}</p>
+                      {gi.price && <p className="text-xs text-slate-500">£{gi.price}</p>}
+                    </div>
+                  </div>
+                  {/* Store column, between the item name and the Add button. */}
+                  <span className="w-24 shrink-0 truncate text-xs text-slate-500">
+                    {gi.store_detail.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleAddFromCatalog(gi)}
+                    disabled={addingCatalogItemId === gi.id}
+                    className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    {addingCatalogItemId === gi.id ? 'Adding…' : 'Add'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
-        {/* Right panel: the list itself, centered in whatever width is left
-            next to the left panel rather than hugging its left edge. */}
-        <div className="mx-auto w-full max-w-2xl space-y-4">
+        {/* Right panel: the list itself, filling whatever width is left
+            next to the left panel. */}
+        <div className="w-full space-y-4">
+          {editingName ? (
+            <form
+              onSubmit={handleRename}
+              className="flex w-full items-center justify-between gap-2 rounded-lg bg-slate-800 px-4 py-2"
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  autoFocus
+                  required
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xl font-semibold text-slate-800 focus:border-slate-500 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={renaming}
+                  className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  {renaming ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingName(false)}
+                  className="rounded-md border border-slate-400 px-3 py-1.5 text-sm font-medium text-slate-100 hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={onBack}
+                className="shrink-0 text-sm font-medium text-slate-300 hover:text-white"
+              >
+                ← Back to shopping lists
+              </button>
+            </form>
+          ) : (
+            <div className="flex w-full items-center justify-between gap-2 rounded-lg bg-slate-800 px-4 py-2">
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-semibold text-white">{list.name}</h1>
+                <button
+                  type="button"
+                  onClick={startEditingName}
+                  title="Rename list"
+                  aria-label="Rename list"
+                  className="text-slate-300 hover:text-white"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={onBack}
+                className="shrink-0 text-sm font-medium text-slate-300 hover:text-white"
+              >
+                ← Back to shopping lists
+              </button>
+            </div>
+          )}
+          {renameError && <p className="text-sm text-red-600">{renameError}</p>}
+
           {visibleItems === null && <p className="text-sm text-slate-400">Loading…</p>}
           {visibleItems !== null && visibleItems.length === 0 && (
             <p className="text-sm text-slate-500">Nothing on this list yet.</p>
           )}
 
           {visibleItems !== null && visibleItems.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-700">Sort by:</span>
-              {(Object.keys(SORT_MODE_LABELS) as SortMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setSortMode(mode)}
-                  className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
-                    sortMode === mode
-                      ? 'border-slate-800 bg-slate-800 text-white'
-                      : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {SORT_MODE_LABELS[mode]}
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-700">Sort by:</span>
+                {(Object.keys(SORT_MODE_LABELS) as SortMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setSortMode(mode)}
+                    className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
+                      sortMode === mode
+                        ? 'border-slate-800 bg-slate-800 text-white'
+                        : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {SORT_MODE_LABELS[mode]}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="shrink-0 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                Print
+              </button>
             </div>
           )}
 
