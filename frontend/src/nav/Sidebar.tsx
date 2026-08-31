@@ -24,6 +24,9 @@ const TABS: { id: NavTab; label: string; icon: typeof UserIcon }[] = [
   { id: 'mealplanner', label: 'Meal Planner', icon: CalendarIcon },
 ]
 
+// Meaningless without a household to scope them to.
+const HOUSEHOLD_SCOPED_TABS: NavTab[] = ['recipes', 'mealplanner']
+
 function loadInitialCollapsed(): boolean {
   const stored = localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)
   if (stored !== null) return stored === 'true'
@@ -40,6 +43,10 @@ export function Sidebar({
   const { logout } = useAuth()
   const { households, currentHousehold, setCurrentHouseholdId } = useHouseholds()
   const [collapsed, setCollapsed] = useState(loadInitialCollapsed)
+
+  const tabs = currentHousehold
+    ? TABS
+    : TABS.filter((tab) => !HOUSEHOLD_SCOPED_TABS.includes(tab.id))
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -82,7 +89,7 @@ export function Sidebar({
       )}
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-3">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const Icon = tab.icon
           const active = activeTab === tab.id
           return (

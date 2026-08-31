@@ -4,7 +4,6 @@ import { AccountPage } from './account/AccountPage'
 import { AuthPage } from './auth/AuthPage'
 import { useAuth } from './auth/AuthContext'
 import { GroceryItemsPage } from './groceries/GroceryItemsPage'
-import { CreateHouseholdPage } from './households/CreateHouseholdPage'
 import { HouseholdPage } from './households/HouseholdPage'
 import { HouseholdsProvider, useHouseholds } from './households/HouseholdsContext'
 import { MealPlannerPage } from './mealplanner/MealPlannerPage'
@@ -30,8 +29,20 @@ function useHealthStatus(): HealthStatus {
 }
 
 function Dashboard() {
-  const [activeTab, setActiveTab] = useState<NavTab>('account')
+  const { currentHousehold } = useHouseholds()
+  // Without a household there's nothing to plan or cook, so default to the
+  // Household tab (where one can be created or joined) rather than Account.
+  const [activeTab, setActiveTab] = useState<NavTab>(currentHousehold ? 'account' : 'household')
   const status = useHealthStatus()
+
+  // Recipes/Meal Planner need a household — if the one in view gets deleted
+  // while a household-scoped tab is active, fall back to Household instead
+  // of rendering a page with nothing to show.
+  useEffect(() => {
+    if (!currentHousehold && (activeTab === 'recipes' || activeTab === 'mealplanner')) {
+      setActiveTab('household')
+    }
+  }, [currentHousehold, activeTab])
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -41,8 +52,8 @@ function Dashboard() {
           {activeTab === 'account' && <AccountPage />}
           {activeTab === 'household' && <HouseholdPage />}
           {activeTab === 'groceries' && <GroceryItemsPage />}
-          {activeTab === 'recipes' && <RecipesPage />}
-          {activeTab === 'mealplanner' && <MealPlannerPage />}
+          {activeTab === 'recipes' && currentHousehold && <RecipesPage />}
+          {activeTab === 'mealplanner' && currentHousehold && <MealPlannerPage />}
         </main>
         <p className="shrink-0 border-t border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-400">
           Backend API:{' '}
@@ -56,7 +67,7 @@ function Dashboard() {
 }
 
 function AuthenticatedApp() {
-  const { households, loading } = useHouseholds()
+  const { loading } = useHouseholds()
 
   if (loading) {
     return (
@@ -64,10 +75,6 @@ function AuthenticatedApp() {
         <p className="text-slate-500">Loading…</p>
       </div>
     )
-  }
-
-  if (households.length === 0) {
-    return <CreateHouseholdPage />
   }
 
   return <Dashboard />

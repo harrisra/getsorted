@@ -22,6 +22,7 @@ class HouseholdViewSet(
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
     """List/create households for the current user; creator becomes its admin."""
@@ -35,6 +36,13 @@ class HouseholdViewSet(
     def perform_update(self, serializer):
         self._require_admin(serializer.instance)
         serializer.save()
+
+    def perform_destroy(self, instance):
+        # Cascades to the household's memberships and all its domain data
+        # (recipes, meal plans, shopping list items) — a user is allowed to
+        # end up in zero households, they just lose access to that data.
+        self._require_admin(instance)
+        instance.delete()
 
     def _require_admin(self, household: Household) -> None:
         is_admin = Membership.objects.filter(

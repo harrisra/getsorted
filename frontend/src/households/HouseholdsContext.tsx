@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import {
   type Household,
   createHousehold as apiCreateHousehold,
+  deleteHousehold as apiDeleteHousehold,
   fetchHouseholds,
 } from '../api/client'
 
@@ -14,6 +15,7 @@ interface HouseholdsContextValue {
   currentHousehold: Household | null
   setCurrentHouseholdId: (id: string) => void
   createHousehold: (name: string) => Promise<Household>
+  deleteHousehold: (id: string) => Promise<void>
   refreshHouseholds: () => Promise<Household[]>
 }
 
@@ -63,6 +65,15 @@ export function HouseholdsProvider({ children }: { children: ReactNode }) {
     [refresh, setCurrentHouseholdId],
   )
 
+  const deleteHousehold = useCallback(
+    async (id: string) => {
+      await apiDeleteHousehold(id)
+      const data = await refresh()
+      resolveCurrentHousehold(data)
+    },
+    [refresh, resolveCurrentHousehold],
+  )
+
   const currentHousehold = households.find((h) => h.id === currentHouseholdId) ?? null
 
   return (
@@ -73,6 +84,7 @@ export function HouseholdsProvider({ children }: { children: ReactNode }) {
         currentHousehold,
         setCurrentHouseholdId,
         createHousehold,
+        deleteHousehold,
         refreshHouseholds: refresh,
       }}
     >

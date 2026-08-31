@@ -168,6 +168,10 @@ export async function updateHouseholdWeekStartDay(
   return response.json()
 }
 
+export async function deleteHousehold(householdId: string): Promise<void> {
+  await apiFetch(`/api/accounts/households/${householdId}/`, { method: 'DELETE' })
+}
+
 export interface Membership {
   user_id: string
   email: string
