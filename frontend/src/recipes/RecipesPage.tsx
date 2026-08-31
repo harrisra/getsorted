@@ -13,6 +13,7 @@ import {
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { useHouseholds } from '../households/HouseholdsContext'
 import { PencilIcon } from '../icons'
+import { RecipeEditView } from './RecipeEditView'
 import { RecipeForm } from './RecipeForm'
 import { downloadRecipesAsJson, parseImportFiles } from './recipeExport'
 
@@ -55,6 +56,7 @@ export function RecipesPage() {
   const householdId = currentHousehold.id
 
   const visibleRecipes = recipes?.filter((r) => r.household === householdId) ?? null
+  const editingRecipe = editingId ? (visibleRecipes?.find((r) => r.id === editingId) ?? null) : null
   const allSelected =
     !!visibleRecipes && visibleRecipes.length > 0 && visibleRecipes.every((r) => selectedIds.has(r.id))
 
@@ -131,6 +133,28 @@ export function RecipesPage() {
       setImporting(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  if (editingRecipe) {
+    return (
+      <div className="mx-auto max-w-[58.8rem] p-4 sm:p-8">
+        <RecipeEditView
+          recipe={editingRecipe}
+          householdId={householdId}
+          onCancel={() => setEditingId(null)}
+          onSubmit={async (updated, imageFile) => {
+            await updateRecipe(editingRecipe.id, updated)
+            if (imageFile) await uploadRecipeImage(editingRecipe.id, imageFile)
+            setEditingId(null)
+            await refresh()
+          }}
+          onRemoveImage={async () => {
+            await deleteRecipeImage(editingRecipe.id)
+            await refresh()
+          }}
+        />
+      </div>
+    )
   }
 
   return (
@@ -232,113 +256,77 @@ export function RecipesPage() {
       )}
 
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        {visibleRecipes?.map((recipe) =>
-          editingId === recipe.id ? (
-            <li key={recipe.id} className="p-4">
-              <RecipeForm
-                householdId={householdId}
-                submitLabel="Save"
-                existingImageUrl={recipe.image}
-                initialValue={{
-                  name: recipe.name,
-                  meal_type: recipe.meal_type,
-                  servings: recipe.servings,
-                  instructions: recipe.instructions,
-                  source_url: recipe.source_url,
-                  image_url: recipe.image_url,
-                  ingredients: recipe.ingredients.map((ing) => ({
-                    name: ing.name,
-                    grams: ing.grams,
-                    pieces: ing.pieces,
-                    milliliters: ing.milliliters,
-                    grocery_item: ing.grocery_item,
-                  })),
-                }}
-                onCancel={() => setEditingId(null)}
-                onSubmit={async (updated, imageFile) => {
-                  await updateRecipe(recipe.id, updated)
-                  if (imageFile) await uploadRecipeImage(recipe.id, imageFile)
-                  setEditingId(null)
-                  await refresh()
-                }}
-                onRemoveImage={async () => {
-                  await deleteRecipeImage(recipe.id)
-                  await refresh()
-                }}
-              />
-            </li>
-          ) : (
-            <li key={recipe.id} className="px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(recipe.id)}
-                    onChange={() => toggleSelected(recipe.id)}
-                    aria-label={`Select ${recipe.name}`}
-                    className="h-4 w-4 shrink-0 rounded border-slate-300"
+        {visibleRecipes?.map((recipe) => (
+          <li key={recipe.id} className="px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(recipe.id)}
+                  onChange={() => toggleSelected(recipe.id)}
+                  aria-label={`Select ${recipe.name}`}
+                  className="h-4 w-4 shrink-0 rounded border-slate-300"
+                />
+                {recipe.image && (
+                  <img
+                    src={recipe.image}
+                    alt=""
+                    className="h-12 w-12 shrink-0 rounded border border-slate-200 object-cover"
                   />
-                  {recipe.image && (
-                    <img
-                      src={recipe.image}
-                      alt=""
-                      className="h-12 w-12 shrink-0 rounded border border-slate-200 object-cover"
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-slate-800">{recipe.name}</p>
-                    <p className="text-sm text-slate-500">
-                      {MEAL_TYPE_LABELS[recipe.meal_type]} · Feeds {recipe.servings}
-                      {recipe.current_cost && (
-                        <>
-                          {' · '}
-                          <span className="font-medium text-slate-700">
-                            £{recipe.current_cost}
+                )}
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-800">{recipe.name}</p>
+                  <p className="text-sm text-slate-500">
+                    {MEAL_TYPE_LABELS[recipe.meal_type]} · Feeds {recipe.servings}
+                    {recipe.current_cost && (
+                      <>
+                        {' · '}
+                        <span className="font-medium text-slate-700">
+                          £{recipe.current_cost}
+                        </span>
+                        {pricedIngredientCount(recipe) < recipe.ingredients.length && (
+                          <span className="text-slate-400">
+                            {' '}
+                            (based on {pricedIngredientCount(recipe)} of{' '}
+                            {recipe.ingredients.length} ingredients)
                           </span>
-                          {pricedIngredientCount(recipe) < recipe.ingredients.length && (
-                            <span className="text-slate-400">
-                              {' '}
-                              (based on {pricedIngredientCount(recipe)} of{' '}
-                              {recipe.ingredients.length} ingredients)
-                            </span>
-                          )}
-                        </>
-                      )}
-                      {recipe.source_url && (
-                        <>
-                          {' · '}
-                          <a
-                            href={recipe.source_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 hover:underline"
-                          >
-                            Recipe link
-                          </a>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex shrink-0 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(recipe.id)}
-                    title="Edit"
-                    aria-label="Edit"
-                    className="text-slate-500 hover:text-slate-900"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-                  <ConfirmDeleteButton
-                    label="Remove recipe"
-                    onConfirm={() => handleDelete(recipe.id)}
-                  />
+                        )}
+                      </>
+                    )}
+                    {recipe.source_url && (
+                      <>
+                        {' · '}
+                        <a
+                          href={recipe.source_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          Recipe link
+                        </a>
+                      </>
+                    )}
+                  </p>
                 </div>
               </div>
-            </li>
-          ),
-        )}
+              <div className="flex shrink-0 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingId(recipe.id)}
+                  title="Edit"
+                  aria-label="Edit"
+                  className="text-slate-500 hover:text-slate-900"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                </button>
+                <ConfirmDeleteButton
+                  label="Remove recipe"
+                  onConfirm={() => handleDelete(recipe.id)}
+                />
+              </div>
+            </div>
+          </li>
+        ))}
       </ul>
     </div>
   )
