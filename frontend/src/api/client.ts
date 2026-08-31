@@ -305,6 +305,7 @@ export interface Recipe {
   instructions: string
   source_url: string
   image: string | null
+  image_url: string
   ingredients: RecipeIngredient[]
   current_cost: string | null
   created_by: string | null

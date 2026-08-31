@@ -190,6 +190,7 @@ export function RecipesPage() {
                   servings: recipe.servings,
                   instructions: recipe.instructions,
                   source_url: recipe.source_url,
+                  image_url: recipe.image_url,
                   ingredients: recipe.ingredients.map((ing) => ({
                     name: ing.name,
                     grams: ing.grams,

@@ -11,6 +11,7 @@ export interface ExportedRecipe {
   servings: number
   instructions: string
   source_url: string
+  image_url: string
   ingredients: {
     name: string
     grams: number | null
@@ -26,6 +27,7 @@ function toExportedRecipe(recipe: Recipe): ExportedRecipe {
     servings: recipe.servings,
     instructions: recipe.instructions,
     source_url: recipe.source_url,
+    image_url: recipe.image_url,
     ingredients: recipe.ingredients.map((ing) => ({
       name: ing.name,
       grams: ing.grams,
@@ -77,6 +79,7 @@ function toRecipeInput(item: unknown, householdId: string): RecipeInput | null {
     servings: typeof item.servings === 'number' ? item.servings : 4,
     instructions: typeof item.instructions === 'string' ? item.instructions : '',
     source_url: typeof item.source_url === 'string' ? item.source_url : '',
+    image_url: typeof item.image_url === 'string' ? item.image_url : '',
     ingredients: rawIngredients.filter(isPlainRecord).map((ing) => ({
       name: typeof ing.name === 'string' ? ing.name : '',
       grams: typeof ing.grams === 'number' ? ing.grams : null,

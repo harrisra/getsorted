@@ -33,6 +33,9 @@ class Recipe(models.Model):
     servings = models.PositiveSmallIntegerField(default=4, help_text="Number of people it feeds")
     instructions = models.TextField(blank=True)
     source_url = models.URLField(blank=True)
+    # An externally-hosted photo, e.g. pasted from the recipe's source site.
+    # Shown only when there's no uploaded image_data — see RecipeImageMixin.
+    image_url = models.URLField(blank=True)
     # Stored in the DB rather than on disk so it survives on an ephemeral
     # container filesystem without needing separate object storage.
     image_data = models.BinaryField(null=True, blank=True)

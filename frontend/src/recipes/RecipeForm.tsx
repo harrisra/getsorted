@@ -19,6 +19,7 @@ const EMPTY: RecipeFormValues = {
   servings: 4,
   instructions: '',
   source_url: '',
+  image_url: '',
   ingredients: [],
 }
 
@@ -53,6 +54,12 @@ export function RecipeForm({
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
   const [removingImage, setRemovingImage] = useState(false)
+  // Only trust the typed image_url for the preview once it's actually been
+  // edited this session — until then, existingImageUrl (the server's
+  // computed effective image) is the more accurate preview, since it already
+  // reflects "an uploaded photo wins over image_url" even when a stored-but-
+  // shadowed image_url happens to be prefilled here too.
+  const [imageUrlEdited, setImageUrlEdited] = useState(false)
 
   useEffect(() => {
     fetchGroceryItems().then(setGroceryItems)
@@ -211,13 +218,19 @@ export function RecipeForm({
         <div className="sm:col-span-2 space-y-1 text-sm">
           <span className="font-medium text-slate-700">Photo (optional)</span>
           <div className="flex items-center gap-3">
-            {(imagePreviewUrl || existingImageUrl) && (
-              <img
-                src={imagePreviewUrl ?? existingImageUrl ?? undefined}
-                alt=""
-                className="h-16 w-16 shrink-0 rounded border border-slate-200 object-cover"
-              />
-            )}
+            {(() => {
+              const previewSrc =
+                imagePreviewUrl ?? (imageUrlEdited ? values.image_url : existingImageUrl)
+              return (
+                previewSrc && (
+                  <img
+                    src={previewSrc}
+                    alt=""
+                    className="h-16 w-16 shrink-0 rounded border border-slate-200 object-cover"
+                  />
+                )
+              )
+            })()}
             <input
               type="file"
               accept="image/*"
@@ -238,6 +251,23 @@ export function RecipeForm({
             )}
           </div>
         </div>
+
+        <label className="sm:col-span-2 space-y-1 text-sm">
+          <span className="font-medium text-slate-700">External image URL (optional)</span>
+          <input
+            type="url"
+            placeholder="https://…"
+            value={values.image_url}
+            onChange={(e) => {
+              set('image_url', e.target.value)
+              setImageUrlEdited(true)
+            }}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          />
+          <span className="block text-xs text-slate-400">
+            Shown only when there's no uploaded photo above.
+          </span>
+        </label>
       </div>
 
       <div className="space-y-2">

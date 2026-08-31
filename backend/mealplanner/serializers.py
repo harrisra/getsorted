@@ -43,9 +43,11 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
 
 class RecipeImageMixin:
     def get_image(self, recipe):
-        if not recipe.image_data:
-            return None
-        return reverse("recipe-image", kwargs={"pk": recipe.pk}, request=self.context.get("request"))
+        """The effective photo to display: an uploaded image wins if present,
+        otherwise the externally-hosted image_url, otherwise none."""
+        if recipe.image_data:
+            return reverse("recipe-image", kwargs={"pk": recipe.pk}, request=self.context.get("request"))
+        return recipe.image_url or None
 
 
 class RecipeSerializer(RecipeImageMixin, serializers.ModelSerializer):
@@ -64,6 +66,7 @@ class RecipeSerializer(RecipeImageMixin, serializers.ModelSerializer):
             "instructions",
             "source_url",
             "image",
+            "image_url",
             "ingredients",
             "current_cost",
             "created_by",
