@@ -100,6 +100,37 @@ export function MealPlannerPage() {
     }
   }
 
+  async function handleMoveRecipe(sourceSlotId: string, targetSlotId: string, recipeId: string) {
+    if (sourceSlotId === targetSlotId) return
+    const sourceSlot = mealPlan?.slots.find((s) => s.id === sourceSlotId)
+    const targetSlot = mealPlan?.slots.find((s) => s.id === targetSlotId)
+    if (!sourceSlot || !targetSlot) return
+
+    if (targetSlot.recipes.includes(recipeId)) {
+      // Already planned on the target day/meal — just drop it from the
+      // source to finish the move rather than duplicating it.
+      await handleSlotChange(sourceSlotId, sourceSlot.recipes.filter((id) => id !== recipeId))
+      return
+    }
+
+    setError(null)
+    try {
+      // Add to the target before removing from the source, so a failure
+      // partway through leaves the recipe duplicated (visible, fixable)
+      // rather than silently dropped from the plan.
+      await updateMealSlotRecipes(targetSlotId, [...targetSlot.recipes, recipeId])
+      await updateMealSlotRecipes(sourceSlotId, sourceSlot.recipes.filter((id) => id !== recipeId))
+      await refreshPlan(household.id, weekStart as string)
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? Object.values(err.fieldErrors).flat().join(' ')
+          : 'Could not move that meal. Please try again.',
+      )
+      await refreshPlan(household.id, weekStart as string)
+    }
+  }
+
   function handleDragStart(event: DragStartEvent) {
     setActiveRecipeId(event.active.data.current?.recipeId ?? null)
   }
@@ -110,13 +141,19 @@ export function MealPlannerPage() {
     if (!over) return
 
     const recipeId = active.data.current?.recipeId as string | undefined
-    const slotId = over.data.current?.slotId as string | undefined
-    if (!recipeId || !slotId) return
+    const sourceSlotId = active.data.current?.sourceSlotId as string | undefined
+    const targetSlotId = over.data.current?.slotId as string | undefined
+    if (!recipeId || !targetSlotId) return
 
-    const slot = mealPlan?.slots.find((s) => s.id === slotId)
+    if (sourceSlotId) {
+      handleMoveRecipe(sourceSlotId, targetSlotId, recipeId)
+      return
+    }
+
+    const slot = mealPlan?.slots.find((s) => s.id === targetSlotId)
     if (!slot || slot.recipes.includes(recipeId)) return
 
-    handleSlotChange(slotId, [...slot.recipes, recipeId])
+    handleSlotChange(targetSlotId, [...slot.recipes, recipeId])
   }
 
   function slotFor(date: string, mealType: MealType) {
@@ -213,7 +250,8 @@ export function MealPlannerPage() {
         {householdRecipes.length > 0 && (
           <div className="shrink-0 space-y-2 border-t border-slate-200 pt-3">
             <span className="text-sm font-medium text-slate-600">
-              Drag a recipe onto a cell to add it
+              Drag a recipe onto a cell to add it — drag a planned meal's ⣿ handle to move it
+              between days
             </span>
             <div className="flex gap-3">
               <FilterSortPills
