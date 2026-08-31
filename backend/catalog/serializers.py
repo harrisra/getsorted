@@ -1,16 +1,24 @@
 from rest_framework import serializers
 
-from .models import GroceryItem
+from .models import GroceryItem, Store
+
+
+class StoreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Store
+        fields = ["id", "name"]
 
 
 class GroceryItemSerializer(serializers.ModelSerializer):
     created_by_email = serializers.EmailField(source="created_by.email", read_only=True)
+    store_detail = StoreSerializer(source="store", read_only=True)
 
     class Meta:
         model = GroceryItem
         fields = [
             "id",
             "store",
+            "store_detail",
             "name",
             "brand",
             "grams",

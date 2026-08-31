@@ -216,9 +216,15 @@ export async function removeMember(householdId: string, userId: string): Promise
   })
 }
 
+export interface Store {
+  id: string
+  name: string
+}
+
 export interface GroceryItem {
   id: string
   store: string
+  store_detail: Store
   name: string
   brand: string
   grams: number | null
@@ -234,8 +240,13 @@ export interface GroceryItem {
 
 export type GroceryItemInput = Omit<
   GroceryItem,
-  'id' | 'created_by_email' | 'created_at' | 'updated_at'
+  'id' | 'store_detail' | 'created_by_email' | 'created_at' | 'updated_at'
 >
+
+export async function fetchStores(): Promise<Store[]> {
+  const response = await apiFetch('/api/catalog/stores/')
+  return response.json()
+}
 
 export async function fetchGroceryItems(): Promise<GroceryItem[]> {
   const response = await apiFetch('/api/catalog/grocery-items/')
@@ -266,7 +277,12 @@ export async function deleteGroceryItem(id: string): Promise<void> {
 }
 
 export interface PopulateResult {
-  store: string
+  /** A matched Store id, or null if the URL's domain didn't confidently
+   * match one of the known stores — see store_name. */
+  store: string | null
+  /** Best-effort store name guessed from the URL, shown even when `store`
+   * couldn't be matched so the user knows what to pick manually. */
+  store_name: string
   name: string
   grams: number | null
   pieces: number | null

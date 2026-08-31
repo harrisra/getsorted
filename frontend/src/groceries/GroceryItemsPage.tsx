@@ -113,7 +113,7 @@ export function GroceryItemsPage() {
                 )}
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-800">
-                    {item.store} — {item.name}
+                    {item.store_detail.name} — {item.name}
                   </p>
                   <p className="truncate text-sm text-slate-500">
                     {[item.brand, formatSize(item)].filter(Boolean).join(' · ')}

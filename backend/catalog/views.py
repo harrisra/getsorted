@@ -7,10 +7,18 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import GroceryItem
-from .serializers import GroceryItemSerializer, PopulateRequestSerializer
+from .models import GroceryItem, Store
+from .serializers import GroceryItemSerializer, PopulateRequestSerializer, StoreSerializer
 
 PEPESTO_PRODUCTS_URL = "https://s.pepesto.com/api/products"
+
+
+class StoreViewSet(viewsets.ReadOnlyModelViewSet):
+    """The fixed list of stores grocery items can be assigned to."""
+
+    queryset = Store.objects.all()
+    serializer_class = StoreSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class GroceryItemViewSet(viewsets.ModelViewSet):
@@ -86,9 +94,18 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
         grams = product.get("quantity", {}).get("grams")
         price_pence = product.get("price", {}).get("price")
 
+        # Just the domain's leading word (e.g. "sainsburys" from
+        # sainsburys.co.uk) — a best-effort guess, so it often won't match
+        # the curated Store list exactly (missing apostrophe, "M&S Food"
+        # vs. "marksandspencer", etc.). Match what we can; leave the rest
+        # for the user to pick from the dropdown themselves.
+        guessed_store_name = domain.split(".")[0].capitalize()
+        matched_store = Store.objects.filter(name__iexact=guessed_store_name).first()
+
         return Response(
             {
-                "store": domain.split(".")[0].capitalize(),
+                "store": str(matched_store.id) if matched_store else None,
+                "store_name": guessed_store_name,
                 "name": product.get("product_name") or name,
                 "grams": grams,
                 "pieces": None,

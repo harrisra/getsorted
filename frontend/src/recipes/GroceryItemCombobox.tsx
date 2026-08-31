@@ -13,7 +13,7 @@ function formatSize(item: GroceryItem): string {
 
 function label(item: GroceryItem): string {
   const size = formatSize(item)
-  return `${item.store} — ${item.name}${size ? ` (${size})` : ''}`
+  return `${item.store_detail.name} — ${item.name}${size ? ` (${size})` : ''}`
 }
 
 export function GroceryItemCombobox({
@@ -46,7 +46,7 @@ export function GroceryItemCombobox({
     trimmed === ''
       ? items
       : items.filter((item) =>
-          `${item.store} ${item.brand} ${item.name}`.toLowerCase().includes(trimmed),
+          `${item.store_detail.name} ${item.brand} ${item.name}`.toLowerCase().includes(trimmed),
         )
   ).slice(0, 8)
 

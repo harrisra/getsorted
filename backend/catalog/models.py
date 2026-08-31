@@ -4,6 +4,24 @@ from django.conf import settings
 from django.db import models
 
 
+class Store(models.Model):
+    """A grocery store/chain, e.g. Tesco, Aldi.
+
+    Its own model (rather than a plain choices list on GroceryItem) so it
+    can grow its own attributes later — logo, website, etc. — without
+    touching GroceryItem.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, unique=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class GroceryItem(models.Model):
     """A store-bought product in the shared, app-wide grocery catalog.
 
@@ -13,7 +31,7 @@ class GroceryItem(models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store = models.CharField(max_length=255)
+    store = models.ForeignKey(Store, on_delete=models.PROTECT, related_name="grocery_items")
     name = models.CharField(max_length=255)
     brand = models.CharField(max_length=255, blank=True)
     # At least one of these must be set — enforced in the serializer, since
@@ -31,7 +49,7 @@ class GroceryItem(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["store", "name"]
+        ordering = ["store__name", "name"]
 
     def __str__(self):
-        return f"{self.store} — {self.name}"
+        return f"{self.store.name} — {self.name}"

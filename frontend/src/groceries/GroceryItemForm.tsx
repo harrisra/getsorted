@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError, type GroceryItemInput, populateGroceryItem } from '../api/client'
+import { ApiError, type GroceryItemInput, type Store, fetchStores, populateGroceryItem } from '../api/client'
 
 const EMPTY: GroceryItemInput = {
   store: '',
@@ -26,6 +26,7 @@ export function GroceryItemForm({
   onCancel?: () => void
 }) {
   const [values, setValues] = useState<GroceryItemInput>(initialValue ?? EMPTY)
+  const [stores, setStores] = useState<Store[]>([])
   const [errors, setErrors] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [populating, setPopulating] = useState(false)
@@ -33,6 +34,10 @@ export function GroceryItemForm({
     kind: 'error' | 'notice'
     text: string
   } | null>(null)
+
+  useEffect(() => {
+    fetchStores().then(setStores)
+  }, [])
 
   function set<K extends keyof GroceryItemInput>(key: K, value: GroceryItemInput[K]) {
     setValues((prev) => ({ ...prev, [key]: value }))
@@ -66,14 +71,16 @@ export function GroceryItemForm({
         product_url: result.product_url || prev.product_url,
         image_url: result.image_url || prev.image_url,
       }))
-      setPopulateMessage(
+      const notes: string[] = []
+      notes.push(
         result.matched_exact
-          ? { kind: 'notice', text: 'Matched the exact product.' }
-          : {
-              kind: 'notice',
-              text: "Couldn't confirm an exact match — filled in the closest product found. Please double-check grams/pieces/milliliters and price.",
-            },
+          ? 'Matched the exact product.'
+          : "Couldn't confirm an exact match — filled in the closest product found. Please double-check grams/pieces/milliliters and price.",
       )
+      if (!result.store) {
+        notes.push(`Couldn't match "${result.store_name}" to a store in the list — please pick one.`)
+      }
+      setPopulateMessage({ kind: 'notice', text: notes.join(' ') })
     } catch (err) {
       setPopulateMessage({
         kind: 'error',
@@ -145,7 +152,24 @@ export function GroceryItemForm({
           )}
         </div>
 
-        <Field label="Store" required value={values.store} onChange={(v) => set('store', v)} />
+        <label className="space-y-1 text-sm">
+          <span className="font-medium text-slate-700">Store</span>
+          <select
+            required
+            value={values.store}
+            onChange={(e) => set('store', e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          >
+            <option value="" disabled>
+              Select a store…
+            </option>
+            {stores.map((store) => (
+              <option key={store.id} value={store.id}>
+                {store.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <Field label="Name" required value={values.name} onChange={(v) => set('name', v)} />
         <Field label="Brand" value={values.brand} onChange={(v) => set('brand', v)} />
         <div className="space-y-1 text-sm">

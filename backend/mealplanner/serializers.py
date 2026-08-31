@@ -6,6 +6,11 @@ from .models import MealPlan, MealSlot, Recipe, RecipeIngredient, ShoppingListIt
 
 
 class GroceryItemSummarySerializer(serializers.ModelSerializer):
+    # Read-only here (nested under RecipeIngredient), so just the store's
+    # name rather than the FK id — GroceryItemCombobox displays/searches it
+    # as plain text.
+    store = serializers.CharField(source="store.name", read_only=True)
+
     class Meta:
         model = GroceryItem
         fields = ["id", "store", "name", "image_url", "price"]
