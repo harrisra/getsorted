@@ -2,13 +2,20 @@ from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from catalog.models import GroceryItem
-from .models import MealPlan, MealSlot, Recipe, RecipeIngredient, ShoppingListItem
+from .models import (
+    MealPlan,
+    MealSlot,
+    Recipe,
+    RecipeIngredient,
+    RecipeIngredientStoreOption,
+    ShoppingListItem,
+)
 
 
 class GroceryItemSummarySerializer(serializers.ModelSerializer):
-    # Read-only here (nested under RecipeIngredient), so just the store's
-    # name rather than the FK id — GroceryItemCombobox displays/searches it
-    # as plain text.
+    # Read-only here (nested under a RecipeIngredientStoreOption), so just
+    # the store's name rather than the FK id — GroceryItemCombobox displays
+    # /searches it as plain text.
     store = serializers.CharField(source="store.name", read_only=True)
 
     class Meta:
@@ -16,8 +23,25 @@ class GroceryItemSummarySerializer(serializers.ModelSerializer):
         fields = ["id", "store", "name", "image_url", "price"]
 
 
-class RecipeIngredientSerializer(serializers.ModelSerializer):
+class RecipeIngredientStoreOptionSerializer(serializers.ModelSerializer):
     grocery_item_detail = GroceryItemSummarySerializer(source="grocery_item", read_only=True)
+    line_cost = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RecipeIngredientStoreOption
+        fields = ["id", "store", "grocery_item", "grocery_item_detail", "line_cost"]
+        read_only_fields = ["id", "store"]
+
+    def get_line_cost(self, option):
+        cost = option.line_cost
+        return str(cost) if cost is not None else None
+
+
+class RecipeIngredientSerializer(serializers.ModelSerializer):
+    # One match per store — see RecipeIngredientStoreOption. Written as raw
+    # dicts by RecipeSerializer._set_ingredients rather than through this
+    # nested serializer's own create/update, same as `ingredients` itself.
+    store_options = RecipeIngredientStoreOptionSerializer(many=True, required=False)
     line_cost = serializers.SerializerMethodField()
 
     class Meta:
@@ -28,8 +52,7 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
             "grams",
             "pieces",
             "milliliters",
-            "grocery_item",
-            "grocery_item_detail",
+            "store_options",
             "line_cost",
         ]
 
@@ -43,6 +66,14 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
 
         if value("grams") is None and value("pieces") is None and value("milliliters") is None:
             raise serializers.ValidationError("Provide grams, pieces, and/or milliliters.")
+
+        store_options = attrs.get("store_options")
+        if store_options:
+            store_ids = [opt["grocery_item"].store_id for opt in store_options]
+            if len(store_ids) != len(set(store_ids)):
+                raise serializers.ValidationError(
+                    {"store_options": "Only one grocery item match is allowed per store."}
+                )
         return attrs
 
 
@@ -98,9 +129,25 @@ class RecipeSerializer(RecipeImageMixin, serializers.ModelSerializer):
         return recipe
 
     def _set_ingredients(self, recipe, ingredients_data):
-        RecipeIngredient.objects.bulk_create(
-            RecipeIngredient(recipe=recipe, **data) for data in ingredients_data
-        )
+        ingredients = []
+        options = []
+        for data in ingredients_data:
+            store_options_data = data.pop("store_options", [])
+            ingredient = RecipeIngredient(recipe=recipe, **data)
+            ingredients.append(ingredient)
+            for opt in store_options_data:
+                grocery_item = opt["grocery_item"]
+                options.append(
+                    RecipeIngredientStoreOption(
+                        recipe_ingredient=ingredient,
+                        grocery_item=grocery_item,
+                        store_id=grocery_item.store_id,
+                    )
+                )
+        # Ingredients first — the options' FK needs their (UUID, so already
+        # client-side generated) ids to already exist as rows.
+        RecipeIngredient.objects.bulk_create(ingredients)
+        RecipeIngredientStoreOption.objects.bulk_create(options)
 
 
 class RecipeSummarySerializer(RecipeImageMixin, serializers.ModelSerializer):

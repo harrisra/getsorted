@@ -34,7 +34,12 @@ class HouseholdScopedViewSet(viewsets.ModelViewSet):
 
 
 class RecipeViewSet(HouseholdScopedViewSet):
-    queryset = Recipe.objects.prefetch_related("ingredients", "ingredients__grocery_item").all()
+    queryset = Recipe.objects.prefetch_related(
+        "ingredients",
+        "ingredients__store_options",
+        "ingredients__store_options__grocery_item",
+        "ingredients__store_options__grocery_item__store",
+    ).all()
     serializer_class = RecipeSerializer
 
     def perform_create(self, serializer):
@@ -84,7 +89,11 @@ class RecipeViewSet(HouseholdScopedViewSet):
 
 class MealPlanViewSet(HouseholdScopedViewSet):
     queryset = MealPlan.objects.prefetch_related(
-        "slots", "slots__recipes", "slots__recipes__ingredients__grocery_item"
+        "slots",
+        "slots__recipes",
+        "slots__recipes__ingredients",
+        "slots__recipes__ingredients__store_options",
+        "slots__recipes__ingredients__store_options__grocery_item",
     )
     serializer_class = MealPlanSerializer
 
@@ -129,7 +138,12 @@ class MealPlanViewSet(HouseholdScopedViewSet):
 
 
 class MealSlotViewSet(HouseholdScopedViewSet):
-    queryset = MealSlot.objects.prefetch_related("recipes", "recipes__ingredients__grocery_item")
+    queryset = MealSlot.objects.prefetch_related(
+        "recipes",
+        "recipes__ingredients",
+        "recipes__ingredients__store_options",
+        "recipes__ingredients__store_options__grocery_item",
+    )
     serializer_class = MealSlotSerializer
     household_lookup = "meal_plan__household__members"
 

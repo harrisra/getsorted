@@ -20,10 +20,16 @@ export function GroceryItemCombobox({
   items,
   value,
   onChange,
+  allowClear = true,
+  placeholder = 'Search grocery items…',
 }: {
   items: GroceryItem[]
   value: string | null
   onChange: (id: string | null) => void
+  /** Show the "Not linked" option and ✕ unlink button — set false when this
+   * combobox always adds a new selection rather than replacing one. */
+  allowClear?: boolean
+  placeholder?: string
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -60,7 +66,7 @@ export function GroceryItemCombobox({
     <div ref={containerRef} className="relative min-w-[10rem] flex-[2]">
       <input
         type="text"
-        placeholder="Search grocery items…"
+        placeholder={placeholder}
         value={open ? query : (selected ? label(selected) : '')}
         onFocus={() => {
           setQuery('')
@@ -69,7 +75,7 @@ export function GroceryItemCombobox({
         onChange={(e) => setQuery(e.target.value)}
         className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
       />
-      {selected && !open && (
+      {allowClear && selected && !open && (
         <button
           type="button"
           onClick={() => selectItem(null)}
@@ -81,16 +87,18 @@ export function GroceryItemCombobox({
       )}
       {open && (
         <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-slate-200 bg-white text-sm shadow-lg">
-          <li>
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => selectItem(null)}
-              className="block w-full px-3 py-1.5 text-left text-slate-400 hover:bg-slate-100"
-            >
-              Not linked
-            </button>
-          </li>
+          {allowClear && (
+            <li>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => selectItem(null)}
+                className="block w-full px-3 py-1.5 text-left text-slate-400 hover:bg-slate-100"
+              >
+                Not linked
+              </button>
+            </li>
+          )}
           {matches.map((item) => (
             <li key={item.id}>
               <button

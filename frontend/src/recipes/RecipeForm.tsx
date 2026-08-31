@@ -82,7 +82,7 @@ export function RecipeForm({
   function addIngredient() {
     set('ingredients', [
       ...values.ingredients,
-      { name: '', grams: null, pieces: null, milliliters: null, grocery_item: null },
+      { name: '', grams: null, pieces: null, milliliters: null, store_options: [] },
     ])
   }
 
@@ -98,6 +98,31 @@ export function RecipeForm({
       'ingredients',
       values.ingredients.filter((_, i) => i !== index),
     )
+  }
+
+  function addStoreOption(index: number, groceryItemId: string) {
+    const ingredient = values.ingredients[index]
+    updateIngredient(index, {
+      store_options: [...ingredient.store_options, { grocery_item: groceryItemId }],
+    })
+  }
+
+  function removeStoreOption(index: number, groceryItemId: string) {
+    const ingredient = values.ingredients[index]
+    updateIngredient(index, {
+      store_options: ingredient.store_options.filter((opt) => opt.grocery_item !== groceryItemId),
+    })
+  }
+
+  // Grocery items from stores this ingredient is already matched to, so the
+  // "add a match" combobox can't offer a second item from the same store —
+  // only one match per store is allowed per ingredient.
+  function availableGroceryItems(ingredient: RecipeIngredientInput) {
+    const matchedItems = groceryItems.filter((gi) =>
+      ingredient.store_options.some((opt) => opt.grocery_item === gi.id),
+    )
+    const usedStoreIds = new Set(matchedItems.map((gi) => gi.store))
+    return groceryItems.filter((gi) => !usedStoreIds.has(gi.store))
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -276,65 +301,99 @@ export function RecipeForm({
           {values.ingredients.map((ingredient, index) => (
             <div
               key={index}
-              className="flex flex-wrap items-center gap-2 rounded-md border border-slate-100 p-2 sm:border-0 sm:p-0"
+              className="space-y-2 rounded-md border border-slate-100 p-2"
             >
-              <input
-                type="text"
-                placeholder="Ingredient"
-                value={ingredient.name}
-                onChange={(e) => updateIngredient(index, { name: e.target.value })}
-                className="min-w-[8rem] flex-[2] rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
-              />
-              <input
-                type="number"
-                min={0}
-                placeholder="Grams"
-                value={ingredient.grams ?? ''}
-                onChange={(e) =>
-                  updateIngredient(index, {
-                    grams: e.target.value === '' ? null : Number(e.target.value),
-                  })
-                }
-                className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
-              />
-              <input
-                type="number"
-                min={0}
-                placeholder="Pieces"
-                value={ingredient.pieces ?? ''}
-                onChange={(e) =>
-                  updateIngredient(index, {
-                    pieces: e.target.value === '' ? null : Number(e.target.value),
-                  })
-                }
-                className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
-              />
-              <input
-                type="number"
-                min={0}
-                placeholder="ml"
-                value={ingredient.milliliters ?? ''}
-                onChange={(e) =>
-                  updateIngredient(index, {
-                    milliliters: e.target.value === '' ? null : Number(e.target.value),
-                  })
-                }
-                className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
-              />
-              <GroceryItemCombobox
-                items={groceryItems}
-                value={ingredient.grocery_item}
-                onChange={(id) => updateIngredient(index, { grocery_item: id })}
-              />
-              <button
-                type="button"
-                onClick={() => removeIngredient(index)}
-                title="Remove"
-                aria-label="Remove ingredient"
-                className="shrink-0 text-red-500 hover:text-red-700"
-              >
-                <TrashIcon className="h-4 w-4" />
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Ingredient"
+                  value={ingredient.name}
+                  onChange={(e) => updateIngredient(index, { name: e.target.value })}
+                  className="min-w-[8rem] flex-[2] rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Grams"
+                  value={ingredient.grams ?? ''}
+                  onChange={(e) =>
+                    updateIngredient(index, {
+                      grams: e.target.value === '' ? null : Number(e.target.value),
+                    })
+                  }
+                  className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Pieces"
+                  value={ingredient.pieces ?? ''}
+                  onChange={(e) =>
+                    updateIngredient(index, {
+                      pieces: e.target.value === '' ? null : Number(e.target.value),
+                    })
+                  }
+                  className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="ml"
+                  value={ingredient.milliliters ?? ''}
+                  onChange={(e) =>
+                    updateIngredient(index, {
+                      milliliters: e.target.value === '' ? null : Number(e.target.value),
+                    })
+                  }
+                  className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeIngredient(index)}
+                  title="Remove"
+                  aria-label="Remove ingredient"
+                  className="shrink-0 text-red-500 hover:text-red-700"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 pl-1">
+                <span className="shrink-0 text-xs font-medium text-slate-500">
+                  Store matches:
+                </span>
+                {ingredient.store_options.map((option) => {
+                  const item = groceryItems.find((gi) => gi.id === option.grocery_item)
+                  return (
+                    <span
+                      key={option.grocery_item}
+                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                    >
+                      {item
+                        ? `${item.store_detail.name}: ${item.name}${item.price ? ` (£${item.price})` : ''}`
+                        : 'Unknown item'}
+                      <button
+                        type="button"
+                        onClick={() => removeStoreOption(index, option.grocery_item)}
+                        title="Remove match"
+                        aria-label="Remove match"
+                        className="text-slate-400 hover:text-red-600"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  )
+                })}
+                <GroceryItemCombobox
+                  items={availableGroceryItems(ingredient)}
+                  value={null}
+                  onChange={(id) => {
+                    if (id) addStoreOption(index, id)
+                  }}
+                  allowClear={false}
+                  placeholder="+ Add a store match…"
+                />
+              </div>
             </div>
           ))}
         </div>

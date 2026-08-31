@@ -2,9 +2,10 @@ import type { MealType, Recipe, RecipeInput } from '../api/client'
 
 // The portable shape used for export/import files. Deliberately excludes
 // anything household- or catalog-specific (id, household, created_by,
-// created_at, image, current_cost, and any grocery_item link) so a file can
-// be shared or re-imported anywhere without dragging along data that
-// wouldn't make sense outside the household it came from.
+// created_at, image, current_cost, and any grocery-item store matches) so a
+// file can be shared or re-imported anywhere without dragging along data
+// that wouldn't make sense outside the household — or even the catalog —
+// it came from.
 export interface ExportedRecipe {
   name: string
   meal_type: MealType
@@ -85,9 +86,10 @@ function toRecipeInput(item: unknown, householdId: string): RecipeInput | null {
       grams: typeof ing.grams === 'number' ? ing.grams : null,
       pieces: typeof ing.pieces === 'number' ? ing.pieces : null,
       milliliters: typeof ing.milliliters === 'number' ? ing.milliliters : null,
-      // Links to grocery items are intentionally ignored on import, even if
-      // a file happens to include one (e.g. a hand-edited export).
-      grocery_item: null,
+      // Store matches are intentionally ignored on import, even if a file
+      // happens to include some (e.g. a hand-edited export) — they're
+      // catalog-specific and wouldn't make sense re-imported elsewhere.
+      store_options: [],
     })),
   }
 }

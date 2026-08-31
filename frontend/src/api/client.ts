@@ -314,21 +314,35 @@ export interface GroceryItemRef {
   price: string | null
 }
 
+export interface RecipeIngredientStoreOption {
+  id: string
+  /** The store this match is for (derived server-side from grocery_item). */
+  store: string
+  grocery_item: string
+  grocery_item_detail: GroceryItemRef
+  line_cost: string | null
+}
+
+export type RecipeIngredientStoreOptionInput = { grocery_item: string }
+
 export interface RecipeIngredient {
   id: string
   name: string
   grams: number | null
   pieces: number | null
   milliliters: number | null
-  grocery_item: string | null
-  grocery_item_detail: GroceryItemRef | null
+  /** At most one match per store — see RecipeIngredientStoreOption. */
+  store_options: RecipeIngredientStoreOption[]
+  /** The cheapest of store_options' line costs. */
   line_cost: string | null
 }
 
 export type RecipeIngredientInput = Omit<
   RecipeIngredient,
-  'id' | 'grocery_item_detail' | 'line_cost'
->
+  'id' | 'store_options' | 'line_cost'
+> & {
+  store_options: RecipeIngredientStoreOptionInput[]
+}
 
 export interface Recipe {
   id: string
