@@ -31,6 +31,7 @@ function pricedIngredientCount(recipe: Recipe): number {
 export function RecipesPage() {
   const { currentHousehold } = useHouseholds()
   const [recipes, setRecipes] = useState<Recipe[] | null>(null)
+  const [mealTypeFilter, setMealTypeFilter] = useState<Recipe['meal_type'] | ''>('')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -57,8 +58,10 @@ export function RecipesPage() {
 
   const visibleRecipes = recipes?.filter((r) => r.household === householdId) ?? null
   const editingRecipe = editingId ? (visibleRecipes?.find((r) => r.id === editingId) ?? null) : null
+  const filteredRecipes =
+    visibleRecipes?.filter((r) => !mealTypeFilter || r.meal_type === mealTypeFilter) ?? null
   const allSelected =
-    !!visibleRecipes && visibleRecipes.length > 0 && visibleRecipes.every((r) => selectedIds.has(r.id))
+    !!filteredRecipes && filteredRecipes.length > 0 && filteredRecipes.every((r) => selectedIds.has(r.id))
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
@@ -70,11 +73,23 @@ export function RecipesPage() {
   }
 
   function toggleSelectAll() {
-    if (!visibleRecipes) return
-    setSelectedIds(allSelected ? new Set() : new Set(visibleRecipes.map((r) => r.id)))
+    if (!filteredRecipes) return
+    // Only toggle the currently-visible (filtered) recipes, so this can't
+    // wipe out a selection made under a different meal-type filter.
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      for (const r of filteredRecipes) {
+        if (allSelected) next.delete(r.id)
+        else next.add(r.id)
+      }
+      return next
+    })
   }
 
   function handleExportSelected() {
+    // Deliberately the full (unfiltered) list — a selection made before
+    // switching the meal-type filter should still be exportable, not
+    // silently dropped because it's no longer visible.
     if (!visibleRecipes) return
     const selected = visibleRecipes.filter((r) => selectedIds.has(r.id))
     if (selected.length === 0) return
@@ -162,6 +177,19 @@ export function RecipesPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold text-slate-800">Recipes</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={mealTypeFilter}
+            onChange={(e) => setMealTypeFilter(e.target.value as Recipe['meal_type'] | '')}
+            aria-label="Filter by meal type"
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-slate-500 focus:outline-none"
+          >
+            <option value="">All meal types</option>
+            {(Object.keys(MEAL_TYPE_LABELS) as Recipe['meal_type'][]).map((mealType) => (
+              <option key={mealType} value={mealType}>
+                {MEAL_TYPE_LABELS[mealType]}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={handleExportSelected}
@@ -241,8 +269,11 @@ export function RecipesPage() {
       {visibleRecipes !== null && visibleRecipes.length === 0 && (
         <p className="text-sm text-slate-500">No recipes yet.</p>
       )}
+      {visibleRecipes !== null && visibleRecipes.length > 0 && filteredRecipes?.length === 0 && (
+        <p className="text-sm text-slate-500">No recipes match this meal type.</p>
+      )}
 
-      {visibleRecipes !== null && visibleRecipes.length > 0 && (
+      {filteredRecipes !== null && filteredRecipes.length > 0 && (
         <label className="flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
@@ -256,7 +287,7 @@ export function RecipesPage() {
       )}
 
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        {visibleRecipes?.map((recipe) => (
+        {filteredRecipes?.map((recipe) => (
           <li key={recipe.id} className="px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-3">
