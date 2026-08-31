@@ -35,6 +35,7 @@ export function RecipesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function refresh() {
@@ -54,6 +55,8 @@ export function RecipesPage() {
   const householdId = currentHousehold.id
 
   const visibleRecipes = recipes?.filter((r) => r.household === householdId) ?? null
+  const allSelected =
+    !!visibleRecipes && visibleRecipes.length > 0 && visibleRecipes.every((r) => selectedIds.has(r.id))
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
@@ -64,11 +67,37 @@ export function RecipesPage() {
     })
   }
 
+  function toggleSelectAll() {
+    if (!visibleRecipes) return
+    setSelectedIds(allSelected ? new Set() : new Set(visibleRecipes.map((r) => r.id)))
+  }
+
   function handleExportSelected() {
     if (!visibleRecipes) return
     const selected = visibleRecipes.filter((r) => selectedIds.has(r.id))
     if (selected.length === 0) return
     downloadRecipesAsJson(selected)
+  }
+
+  async function handleDeleteSelected() {
+    if (!visibleRecipes) return
+    setDeleteMessage(null)
+    const targets = visibleRecipes.filter((r) => selectedIds.has(r.id))
+    if (targets.length === 0) return
+
+    const results = await Promise.allSettled(targets.map((r) => deleteRecipe(r.id)))
+    const failed = targets.filter((_, i) => results[i].status === 'rejected')
+
+    // Deselect whatever actually got deleted; leave any failures selected
+    // so it's obvious what still needs another try.
+    setSelectedIds(new Set(failed.map((r) => r.id)))
+    await refresh()
+
+    if (failed.length > 0) {
+      setDeleteMessage(
+        `Deleted ${targets.length - failed.length} of ${targets.length} recipe(s) — ${failed.length} failed and are still selected.`,
+      )
+    }
   }
 
   async function handleImportFiles(files: FileList) {
@@ -117,6 +146,15 @@ export function RecipesPage() {
           >
             Export selected ({selectedIds.size})
           </button>
+          <ConfirmDeleteButton
+            label="Delete selected recipes"
+            confirmMessage={`Delete ${selectedIds.size} recipe(s)?`}
+            disabled={selectedIds.size === 0}
+            onConfirm={handleDeleteSelected}
+            className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+          >
+            Delete selected ({selectedIds.size})
+          </ConfirmDeleteButton>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -155,6 +193,10 @@ export function RecipesPage() {
         </p>
       )}
 
+      {deleteMessage && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteMessage}</p>
+      )}
+
       {showAddForm && (
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <RecipeForm
@@ -174,6 +216,19 @@ export function RecipesPage() {
       {visibleRecipes === null && <p className="text-sm text-slate-400">Loading…</p>}
       {visibleRecipes !== null && visibleRecipes.length === 0 && (
         <p className="text-sm text-slate-500">No recipes yet.</p>
+      )}
+
+      {visibleRecipes !== null && visibleRecipes.length > 0 && (
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={toggleSelectAll}
+            aria-label="Select all recipes"
+            className="h-4 w-4 shrink-0 rounded border-slate-300"
+          />
+          Select all
+        </label>
       )}
 
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -220,7 +275,7 @@ export function RecipesPage() {
                     type="checkbox"
                     checked={selectedIds.has(recipe.id)}
                     onChange={() => toggleSelected(recipe.id)}
-                    aria-label={`Select ${recipe.name} for export`}
+                    aria-label={`Select ${recipe.name}`}
                     className="h-4 w-4 shrink-0 rounded border-slate-300"
                   />
                   {recipe.image && (
