@@ -35,7 +35,7 @@ class Recipe(models.Model):
     source_url = models.URLField(blank=True)
     # An externally-hosted photo, e.g. pasted from the recipe's source site.
     # Shown only when there's no uploaded image_data — see RecipeImageMixin.
-    image_url = models.URLField(blank=True)
+    image_url = models.URLField(blank=True, max_length=400)
     # Stored in the DB rather than on disk so it survives on an ephemeral
     # container filesystem without needing separate object storage.
     image_data = models.BinaryField(null=True, blank=True)

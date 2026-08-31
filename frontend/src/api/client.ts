@@ -36,6 +36,20 @@ const TOKEN_REFRESH_PATH = '/api/auth/token/refresh/'
 // firing their own.
 let refreshPromise: Promise<boolean> | null = null
 
+// The refresh-token cookie is scoped to the browser, not this tab — if a
+// different account logs in in another tab/window of the same browser, its
+// login silently overwrites this cookie for every tab on the domain. A
+// refresh here would then hand this tab an access token for THAT account
+// with nothing to notice the swap. Listeners (see AuthContext) get notified
+// after every successful silent refresh so they can re-verify identity
+// rather than assume the refresh renewed the same session it started with.
+const refreshListeners = new Set<() => void>()
+
+export function onSilentTokenRefresh(listener: () => void): () => void {
+  refreshListeners.add(listener)
+  return () => refreshListeners.delete(listener)
+}
+
 function refreshAccessToken(): Promise<boolean> {
   if (!refreshPromise) {
     refreshPromise = fetch(`${API_BASE_URL}${TOKEN_REFRESH_PATH}`, {
@@ -43,6 +57,10 @@ function refreshAccessToken(): Promise<boolean> {
       credentials: 'include',
     })
       .then((response) => response.ok)
+      .then((ok) => {
+        if (ok) refreshListeners.forEach((listener) => listener())
+        return ok
+      })
       .catch(() => false)
       .finally(() => {
         refreshPromise = null

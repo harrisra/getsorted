@@ -1,10 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   type CurrentUser,
   fetchCurrentUser,
   login as apiLogin,
   logout as apiLogout,
+  onSilentTokenRefresh,
   signup as apiSignup,
 } from '../api/client'
 
@@ -21,6 +22,8 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const userRef = useRef<CurrentUser | null>(null)
+  userRef.current = user
 
   const refresh = useCallback(async () => {
     setUser(await fetchCurrentUser())
@@ -29,6 +32,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refresh().finally(() => setLoading(false))
   }, [refresh])
+
+  // A silent access-token refresh reuses whatever refresh-token cookie is in
+  // the browser at that moment — if another account logged in elsewhere in
+  // this same browser meanwhile, that's no longer this tab's session. Rather
+  // than silently keep going as whoever that cookie now belongs to, check
+  // identity held steady and reload if it didn't, so every piece of state
+  // (household, recipes, everything) gets rebuilt fresh under whoever is
+  // actually logged in now.
+  useEffect(() => {
+    return onSilentTokenRefresh(() => {
+      fetchCurrentUser().then((refreshedUser) => {
+        const previousId = userRef.current?.pk ?? null
+        const refreshedId = refreshedUser?.pk ?? null
+        if (refreshedId !== previousId) {
+          window.location.reload()
+        }
+      })
+    })
+  }, [])
 
   const login = useCallback(async (email: string, password: string) => {
     await apiLogin(email, password)
