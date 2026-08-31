@@ -3,11 +3,13 @@ import type { FormEvent } from 'react'
 import {
   AISLE_OPTIONS,
   ApiError,
+  SCRAPE_ALLOWED_EMAIL,
   type GroceryItemInput,
   type Store,
   fetchStores,
   populateGroceryItem,
 } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 
 const EMPTY: GroceryItemInput = {
   store: '',
@@ -33,6 +35,8 @@ export function GroceryItemForm({
   onSubmit: (item: GroceryItemInput) => Promise<void>
   onCancel?: () => void
 }) {
+  const { user } = useAuth()
+  const canPopulate = user?.email === SCRAPE_ALLOWED_EMAIL
   const [values, setValues] = useState<GroceryItemInput>(initialValue ?? EMPTY)
   const [stores, setStores] = useState<Store[]>([])
   const [errors, setErrors] = useState<string[]>([])
@@ -140,14 +144,16 @@ export function GroceryItemForm({
               onChange={(e) => set('product_url', e.target.value)}
               className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
             />
-            <button
-              type="button"
-              onClick={handlePopulate}
-              disabled={populating}
-              className="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-            >
-              {populating ? 'Populating…' : 'Populate'}
-            </button>
+            {canPopulate && (
+              <button
+                type="button"
+                onClick={handlePopulate}
+                disabled={populating}
+                className="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {populating ? 'Populating…' : 'Populate'}
+              </button>
+            )}
           </div>
           {populateMessage && (
             <p

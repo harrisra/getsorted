@@ -1,5 +1,10 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
+// The only account the /populate/ and /scrape/ grocery-item lookups are
+// available to — mirrors backend/catalog/views.py's SCRAPE_ALLOWED_EMAIL.
+// Just hides the buttons here; the backend enforces it for real.
+export const SCRAPE_ALLOWED_EMAIL = 'rob.harris@harristribe.co.uk'
+
 export interface CurrentUser {
   pk: string
   email: string

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   AISLE_OPTIONS,
   ApiError,
+  SCRAPE_ALLOWED_EMAIL,
   type GroceryItem,
   type GroceryItemInput,
   type ScrapeResultRow,
@@ -273,7 +274,7 @@ export function GroceryItemsPage() {
               }
             }}
           />
-          {!showScrapeForm && (
+          {!showScrapeForm && user?.email === SCRAPE_ALLOWED_EMAIL && (
             <button
               type="button"
               onClick={() => setShowScrapeForm(true)}
@@ -304,7 +305,7 @@ export function GroceryItemsPage() {
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteMessage}</p>
       )}
 
-      {showScrapeForm && (
+      {showScrapeForm && user?.email === SCRAPE_ALLOWED_EMAIL && (
         <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
           <div>
             <span className="text-sm font-medium text-slate-700">Scrape from URLs</span>

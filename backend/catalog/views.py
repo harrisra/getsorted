@@ -18,11 +18,64 @@ from .serializers import (
 )
 
 PEPESTO_PRODUCTS_URL = "https://s.pepesto.com/api/products"
+SAINSBURYS_SEARCH_URL = "https://www.sainsburys.co.uk/groceries-api/gol-services/product/v1/product"
+SCRAPE_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+)
 
 # A single /scrape/ request looks each URL up synchronously (no background
 # job queue in this stack) — cap how many can be pasted in at once so one
 # request can't hang for minutes or trip a gateway timeout.
 MAX_SCRAPE_URLS = 25
+
+# /populate/ and /scrape/ both hit external services (Pepesto's paid API,
+# Sainsbury's own site) on the caller's behalf — restricted to one account
+# rather than opened up to every signed-in user of the app.
+SCRAPE_ALLOWED_EMAIL = "rob.harris@harristribe.co.uk"
+
+SIZE_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(kg|g|litres?|l|ml)\b|(\d+)\s*(?:x|pack|pieces?|pcs?)\b", re.IGNORECASE
+)
+
+
+def _parse_size(text):
+    """Best-effort grams/pieces/milliliters from a free-text size string
+    such as '350g', '1.5kg', '500ml', '6 pack' — used against scraped
+    product data whose exact format isn't guaranteed. Returns
+    (grams, pieces, milliliters), each None if nothing matched."""
+    if not text:
+        return None, None, None
+    match = SIZE_RE.search(text)
+    if not match:
+        return None, None, None
+    amount, unit, count = match.group(1), match.group(2), match.group(3)
+    if count is not None:
+        return None, int(count), None
+    amount = float(amount)
+    unit = unit.lower()
+    if unit == "kg":
+        return round(amount * 1000), None, None
+    if unit == "g":
+        return round(amount), None, None
+    if unit in ("l", "litre", "litres"):
+        return None, None, round(amount * 1000)
+    if unit == "ml":
+        return None, None, round(amount)
+    return None, None, None
+
+
+def _dig(obj, *path):
+    """Best-effort nested lookup — obj[path[0]][path[1]]..., supporting
+    both dict keys and list indices. Returns None on any missing key/
+    index/type mismatch rather than raising, since scraped JSON shapes
+    aren't guaranteed to match what's expected."""
+    for key in path:
+        try:
+            obj = obj[key]
+        except (KeyError, IndexError, TypeError):
+            return None
+    return obj
 
 
 def _guess_name_from_url(url):
@@ -117,6 +170,128 @@ def _pepesto_lookup(name, product_url):
     }, None
 
 
+def _is_sainsburys_url(url):
+    hostname = (urlparse(url).hostname or "").removeprefix("www.")
+    return hostname == "sainsburys.co.uk"
+
+
+def _scrape_sainsburys(url):
+    """Look up a Sainsbury's product directly via their own product search
+    API, rather than through Pepesto — no third-party lookup needed for
+    this store. Searches by a name guessed from the URL's slug (there's no
+    working direct-by-URL lookup we've found), takes the top result, and
+    parses out whatever fields are present.
+
+    NOTE: this server's outbound IP got a flat "Access Denied" (Akamai edge
+    block) from sainsburys.co.uk in testing, for both the product pages and
+    this API, regardless of headers — likely a datacenter-IP block rather
+    than anything fixable by request-crafting. This may work fine from a
+    different network (e.g. residential IP) even though it couldn't be
+    verified live from here. The field names below (name/price/size/image)
+    are a best guess at the response shape, since a real successful
+    response was never seen to confirm against — if they turn out wrong,
+    every result will fail with "could not parse", which is the signal to
+    come back and fix the field paths in _dig(...) below.
+
+    Returns (data, error) in the same shape as _pepesto_lookup.
+    """
+    keyword = _guess_name_from_url(url)
+    if not keyword:
+        return None, (
+            {"detail": "Could not determine a product name from this URL."},
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        response = requests.get(
+            SAINSBURYS_SEARCH_URL,
+            params={"filter[keyword]": keyword, "page_number": 1, "page_size": 24},
+            headers={"Accept": "application/json"},
+            timeout=15,
+        )
+    except requests.RequestException:
+        return None, (
+            {"detail": "Could not reach Sainsbury's product search. Try again later."},
+            status.HTTP_502_BAD_GATEWAY,
+        )
+
+    # Distinguished from a connection failure: this means the request did
+    # reach Sainsbury's, but their edge/bot protection rejected it outright
+    # (seen consistently in testing regardless of headers used — possibly
+    # specific to this server's outbound IP, so this may not reproduce from
+    # elsewhere) rather than the service being unreachable.
+    if response.status_code in (401, 403):
+        return None, (
+            {"detail": "Sainsbury's blocked this request (access denied). Add the item manually instead."},
+            status.HTTP_502_BAD_GATEWAY,
+        )
+
+    try:
+        response.raise_for_status()
+        payload = response.json()
+    except requests.RequestException:
+        return None, (
+            {"detail": "Could not reach Sainsbury's product search. Try again later."},
+            status.HTTP_502_BAD_GATEWAY,
+        )
+    except ValueError:
+        return None, (
+            {"detail": "Sainsbury's product search returned an unexpected response."},
+            status.HTTP_502_BAD_GATEWAY,
+        )
+
+    products = _dig(payload, "products") or _dig(payload, "data", "products") or []
+    if not products:
+        return None, ({"detail": "No matching product found on Sainsbury's."}, status.HTTP_404_NOT_FOUND)
+
+    product = products[0]
+
+    name = _dig(product, "name") or _dig(product, "product_name") or _dig(product, "title") or keyword.title()
+
+    price = (
+        _dig(product, "retail_price", "price")
+        or _dig(product, "price", "now")
+        or _dig(product, "unit_price", "price")
+        or _dig(product, "price")
+    )
+    price = f"{float(price):.2f}" if isinstance(price, (int, float)) else None
+
+    size_text = (
+        _dig(product, "unit_qty") or _dig(product, "weight_display") or _dig(product, "pack_size") or ""
+    )
+    grams, pieces, milliliters = _parse_size(str(size_text))
+    if grams is None and pieces is None and milliliters is None:
+        grams, pieces, milliliters = _parse_size(name)
+
+    image_url = (
+        _dig(product, "image_url")
+        or _dig(product, "images", 0, "url")
+        or _dig(product, "product_image", "default", "url")
+        or _dig(product, "media", "images", 0, "default", "url")
+        or ""
+    )
+
+    sainsburys = Store.objects.filter(name__iexact="Sainsburys").first()
+
+    return {
+        "store": sainsburys,
+        "store_name": "Sainsburys",
+        "name": name,
+        "grams": grams,
+        "pieces": pieces,
+        "milliliters": milliliters,
+        "price": price,
+        # The URL the caller gave us, not something read back out of the
+        # search result — this is a keyword search, not a lookup by that
+        # exact URL, so there's no more authoritative product_url to use.
+        "product_url": url,
+        "image_url": image_url,
+        # Never "exact" — this is a best-effort name search, not a direct
+        # lookup of the product at this specific URL.
+        "matched_exact": False,
+    }, None
+
+
 def _flatten_errors(errors):
     return "; ".join(
         f"{field}: {', '.join(str(m) for m in messages)}" for field, messages in errors.items()
@@ -163,6 +338,9 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
         for the caller to review/edit before saving — see scrape() for saving
         straight away from a list of URLs instead.
         """
+        if request.user.email != SCRAPE_ALLOWED_EMAIL:
+            raise PermissionDenied("Not available on this account.")
+
         if not settings.PEPESTO_API_KEY:
             return Response(
                 {"detail": "Pepesto API key not configured on the server."},
@@ -195,6 +373,9 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
         fails independently, and the per-URL results (created item or a
         reason it wasn't) are all returned together.
         """
+        if request.user.email != SCRAPE_ALLOWED_EMAIL:
+            raise PermissionDenied("Not available on this account.")
+
         if not settings.PEPESTO_API_KEY:
             return Response(
                 {"detail": "Pepesto API key not configured on the server."},
@@ -216,7 +397,10 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
                 results.append({"url": url, "status": "error", "detail": "Not a valid URL."})
                 continue
 
-            data, error = _pepesto_lookup(_guess_name_from_url(url), url)
+            if _is_sainsburys_url(url):
+                data, error = _scrape_sainsburys(url)
+            else:
+                data, error = _pepesto_lookup(_guess_name_from_url(url), url)
             if error:
                 body, _error_status = error
                 results.append(
