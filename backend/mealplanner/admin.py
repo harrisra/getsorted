@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from .models import MealPlan, MealSlot, Recipe, RecipeIngredient, ShoppingListItem
+from .models import (
+    MealPlan,
+    MealSlot,
+    Recipe,
+    RecipeIngredient,
+    ShoppingList,
+    ShoppingListItem,
+)
 
 
 class MealSlotInline(admin.TabularInline):
@@ -10,6 +17,11 @@ class MealSlotInline(admin.TabularInline):
 
 class RecipeIngredientInline(admin.TabularInline):
     model = RecipeIngredient
+    extra = 1
+
+
+class ShoppingListItemInline(admin.TabularInline):
+    model = ShoppingListItem
     extra = 1
 
 
@@ -28,7 +40,15 @@ class RecipeAdmin(admin.ModelAdmin):
     inlines = [RecipeIngredientInline]
 
 
+@admin.register(ShoppingList)
+class ShoppingListAdmin(admin.ModelAdmin):
+    list_display = ["name", "household", "created_by", "created_at"]
+    list_filter = ["household"]
+    search_fields = ["name"]
+    inlines = [ShoppingListItemInline]
+
+
 @admin.register(ShoppingListItem)
 class ShoppingListItemAdmin(admin.ModelAdmin):
-    list_display = ["name", "household", "quantity", "is_checked"]
-    list_filter = ["household", "is_checked"]
+    list_display = ["name", "shopping_list", "quantity", "is_checked"]
+    list_filter = ["shopping_list__household", "is_checked"]

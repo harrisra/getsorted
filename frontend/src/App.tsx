@@ -9,6 +9,7 @@ import { HouseholdsProvider, useHouseholds } from './households/HouseholdsContex
 import { MealPlannerPage } from './mealplanner/MealPlannerPage'
 import { Sidebar, type NavTab } from './nav/Sidebar'
 import { RecipesPage } from './recipes/RecipesPage'
+import { ShoppingListsPage } from './shoppinglist/ShoppingListsPage'
 
 type HealthStatus = 'checking' | 'ok' | 'error'
 
@@ -35,11 +36,14 @@ function Dashboard() {
   const [activeTab, setActiveTab] = useState<NavTab>(currentHousehold ? 'account' : 'household')
   const status = useHealthStatus()
 
-  // Recipes/Meal Planner need a household — if the one in view gets deleted
-  // while a household-scoped tab is active, fall back to Household instead
-  // of rendering a page with nothing to show.
+  // Recipes/Meal Planner/Shopping List need a household — if the one in
+  // view gets deleted while a household-scoped tab is active, fall back to
+  // Household instead of rendering a page with nothing to show.
   useEffect(() => {
-    if (!currentHousehold && (activeTab === 'recipes' || activeTab === 'mealplanner')) {
+    if (
+      !currentHousehold &&
+      (activeTab === 'recipes' || activeTab === 'mealplanner' || activeTab === 'shoppinglist')
+    ) {
       setActiveTab('household')
     }
   }, [currentHousehold, activeTab])
@@ -54,6 +58,7 @@ function Dashboard() {
           {activeTab === 'groceries' && <GroceryItemsPage />}
           {activeTab === 'recipes' && currentHousehold && <RecipesPage />}
           {activeTab === 'mealplanner' && currentHousehold && <MealPlannerPage />}
+          {activeTab === 'shoppinglist' && currentHousehold && <ShoppingListsPage />}
         </main>
         <p className="shrink-0 border-t border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-400">
           Backend API:{' '}

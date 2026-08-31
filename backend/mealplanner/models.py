@@ -205,13 +205,32 @@ class MealSlot(models.Model):
         return f"{self.date} {self.meal_type}"
 
 
-class ShoppingListItem(models.Model):
-    """An item on a household's shopping list, optionally linked to a meal plan."""
+class ShoppingList(models.Model):
+    """A named shopping list within a household — a household can have
+    several going at once (e.g. "This week", "Costco run")."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     household = models.ForeignKey(
-        Household, on_delete=models.CASCADE, related_name="shopping_list_items"
+        Household, on_delete=models.CASCADE, related_name="shopping_lists"
     )
+    name = models.CharField(max_length=255)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.household.name} — {self.name}"
+
+
+class ShoppingListItem(models.Model):
+    """An item on a shopping list, optionally linked to a meal plan."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    shopping_list = models.ForeignKey(ShoppingList, on_delete=models.CASCADE, related_name="items")
     meal_plan = models.ForeignKey(
         MealPlan, on_delete=models.SET_NULL, null=True, blank=True, related_name="shopping_items"
     )

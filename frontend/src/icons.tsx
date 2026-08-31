@@ -43,6 +43,19 @@ export function BasketIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function ChecklistIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M4 6.5 5.5 8 8 5" />
+      <path d="M4 12.5 5.5 14 8 11" />
+      <path d="M4 18.5 5.5 20 8 17" />
+      <line x1="11" y1="6.5" x2="20" y2="6.5" />
+      <line x1="11" y1="12.5" x2="20" y2="12.5" />
+      <line x1="11" y1="18.5" x2="20" y2="18.5" />
+    </Icon>
+  )
+}
+
 export function BookIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>

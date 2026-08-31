@@ -8,6 +8,7 @@ from .models import (
     Recipe,
     RecipeIngredient,
     RecipeIngredientStoreOption,
+    ShoppingList,
     ShoppingListItem,
 )
 
@@ -221,17 +222,52 @@ class MealPlanSerializer(serializers.ModelSerializer):
         return str(sum(all_costs)) if all_costs else None
 
 
+class ShoppingListSerializer(serializers.ModelSerializer):
+    created_by_email = serializers.SerializerMethodField()
+    item_count = serializers.IntegerField(source="items.count", read_only=True)
+
+    class Meta:
+        model = ShoppingList
+        fields = ["id", "household", "name", "item_count", "created_by", "created_by_email", "created_at"]
+        read_only_fields = ["created_by", "created_at"]
+
+    def get_created_by_email(self, obj):
+        return obj.created_by.email if obj.created_by else None
+
+
 class ShoppingListItemSerializer(serializers.ModelSerializer):
+    # A plain source="added_by.email" field would be silently omitted from
+    # the response (not serialized as null) for an item added_by=None — see
+    # the equivalent note on catalog.GroceryItemSerializer.created_by_email.
+    added_by_email = serializers.SerializerMethodField()
+
     class Meta:
         model = ShoppingListItem
         fields = [
             "id",
-            "household",
+            "shopping_list",
             "meal_plan",
             "name",
             "quantity",
             "is_checked",
             "added_by",
+            "added_by_email",
             "created_at",
         ]
         read_only_fields = ["added_by", "created_at"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Restrict which shopping lists this item can be filed under to ones
+        # in the requesting user's own households — otherwise the default
+        # queryset (every ShoppingList in the system) would let a user post
+        # an item into a household they don't belong to just by knowing/
+        # guessing its id.
+        request = self.context.get("request")
+        if request is not None:
+            self.fields["shopping_list"].queryset = ShoppingList.objects.filter(
+                household__members=request.user
+            )
+
+    def get_added_by_email(self, obj):
+        return obj.added_by.email if obj.added_by else None

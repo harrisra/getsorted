@@ -471,3 +471,101 @@ export async function updateMealSlotRecipes(
   })
   return response.json()
 }
+
+export interface ShoppingList {
+  id: string
+  household: string
+  name: string
+  item_count: number
+  created_by: string | null
+  created_by_email: string | null
+  created_at: string
+}
+
+export async function fetchShoppingLists(): Promise<ShoppingList[]> {
+  const response = await apiFetch('/api/mealplanner/shopping-lists/')
+  return response.json()
+}
+
+export async function createShoppingList(
+  householdId: string,
+  name: string,
+): Promise<ShoppingList> {
+  const response = await apiFetch('/api/mealplanner/shopping-lists/', {
+    method: 'POST',
+    body: JSON.stringify({ household: householdId, name }),
+  })
+  return response.json()
+}
+
+export async function renameShoppingList(id: string, name: string): Promise<ShoppingList> {
+  const response = await apiFetch(`/api/mealplanner/shopping-lists/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  })
+  return response.json()
+}
+
+export async function deleteShoppingList(id: string): Promise<void> {
+  await apiFetch(`/api/mealplanner/shopping-lists/${id}/`, { method: 'DELETE' })
+}
+
+// Builds items on this list from the recipes planned across the given
+// dates (see the backend for the merge-by-ingredient-name behavior).
+export async function generateShoppingList(
+  shoppingListId: string,
+  dates: string[],
+): Promise<ShoppingListItem[]> {
+  const response = await apiFetch(`/api/mealplanner/shopping-lists/${shoppingListId}/generate/`, {
+    method: 'POST',
+    body: JSON.stringify({ dates }),
+  })
+  return response.json()
+}
+
+export interface ShoppingListItem {
+  id: string
+  shopping_list: string
+  meal_plan: string | null
+  name: string
+  quantity: string
+  is_checked: boolean
+  added_by: string | null
+  added_by_email: string | null
+  created_at: string
+}
+
+export type ShoppingListItemInput = Omit<
+  ShoppingListItem,
+  'id' | 'added_by' | 'added_by_email' | 'created_at'
+>
+
+export async function fetchShoppingListItems(): Promise<ShoppingListItem[]> {
+  const response = await apiFetch('/api/mealplanner/shopping-list-items/')
+  return response.json()
+}
+
+export async function createShoppingListItem(
+  item: ShoppingListItemInput,
+): Promise<ShoppingListItem> {
+  const response = await apiFetch('/api/mealplanner/shopping-list-items/', {
+    method: 'POST',
+    body: JSON.stringify(item),
+  })
+  return response.json()
+}
+
+export async function updateShoppingListItem(
+  id: string,
+  patch: Partial<ShoppingListItemInput>,
+): Promise<ShoppingListItem> {
+  const response = await apiFetch(`/api/mealplanner/shopping-list-items/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+  return response.json()
+}
+
+export async function deleteShoppingListItem(id: string): Promise<void> {
+  await apiFetch(`/api/mealplanner/shopping-list-items/${id}/`, { method: 'DELETE' })
+}
