@@ -4,6 +4,7 @@ import requests
 from django.conf import settings
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -22,7 +23,9 @@ class StoreViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class GroceryItemViewSet(viewsets.ModelViewSet):
-    """Shared, app-wide grocery catalog. Any signed-in user can manage entries."""
+    """Shared, app-wide grocery catalog. Any signed-in user can view, add,
+    and edit entries; only the account that created an entry can delete it.
+    """
 
     queryset = GroceryItem.objects.all()
     serializer_class = GroceryItemSerializer
@@ -30,6 +33,15 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        # created_by can be null (the creator's account was later deleted —
+        # see settings.AUTH_USER_MODEL's on_delete=SET_NULL) — with no
+        # rightful owner left to check against, anyone can delete it rather
+        # than it being stuck undeletable via the API.
+        if instance.created_by_id is not None and instance.created_by_id != self.request.user.id:
+            raise PermissionDenied("Only the account that added this item can delete it.")
+        instance.delete()
 
     @action(detail=False, methods=["post"], url_path="populate")
     def populate(self, request):

@@ -10,7 +10,13 @@ class StoreSerializer(serializers.ModelSerializer):
 
 
 class GroceryItemSerializer(serializers.ModelSerializer):
-    created_by_email = serializers.EmailField(source="created_by.email", read_only=True)
+    # A plain source="created_by.email" field would just be omitted from the
+    # response for an item with no creator (created_by is nullable — the
+    # creator's account can later be deleted), rather than serializing as
+    # null: traversing ".email" on a None raises AttributeError, and DRF's
+    # Field.get_attribute() turns that into SkipField for a non-required
+    # field. A method field sidesteps that and always returns a value.
+    created_by_email = serializers.SerializerMethodField()
     store_detail = StoreSerializer(source="store", read_only=True)
 
     class Meta:
@@ -32,6 +38,9 @@ class GroceryItemSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+    def get_created_by_email(self, obj):
+        return obj.created_by.email if obj.created_by else None
 
     def validate(self, attrs):
         def value(field):

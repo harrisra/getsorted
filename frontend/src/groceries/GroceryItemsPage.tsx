@@ -10,6 +10,7 @@ import {
   fetchStores,
   updateGroceryItem,
 } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { PencilIcon } from '../icons'
 import { GroceryItemEditView } from './GroceryItemEditView'
@@ -27,6 +28,7 @@ function formatSize(item: GroceryItem): string {
 }
 
 export function GroceryItemsPage() {
+  const { user } = useAuth()
   const [items, setItems] = useState<GroceryItem[] | null>(null)
   const [stores, setStores] = useState<Store[]>([])
   const [storeFilter, setStoreFilter] = useState('')
@@ -339,7 +341,13 @@ export function GroceryItemsPage() {
                 </p>
               </div>
             </div>
-            <div className="flex shrink-0 gap-3">
+            <div className="flex shrink-0 items-center gap-3">
+              <span
+                className="max-w-[10rem] truncate text-xs text-slate-400"
+                title={item.created_by_email ?? undefined}
+              >
+                {item.created_by_email ?? 'Unknown'}
+              </span>
               <button
                 type="button"
                 onClick={() => setEditingId(item.id)}
@@ -349,10 +357,12 @@ export function GroceryItemsPage() {
               >
                 <PencilIcon className="h-4 w-4" />
               </button>
-              <ConfirmDeleteButton
-                label="Remove grocery item"
-                onConfirm={() => handleDelete(item.id)}
-              />
+              {(item.created_by_email == null || item.created_by_email === user?.email) && (
+                <ConfirmDeleteButton
+                  label="Remove grocery item"
+                  onConfirm={() => handleDelete(item.id)}
+                />
+              )}
             </div>
           </li>
         ))}
