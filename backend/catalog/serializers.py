@@ -57,3 +57,7 @@ class PopulateRequestSerializer(serializers.Serializer):
         help_text="A rough product description, e.g. 'Tesco British Cooked Ham Slices 120g'."
     )
     product_url = serializers.URLField()
+
+
+class ScrapeRequestSerializer(serializers.Serializer):
+    urls = serializers.CharField(help_text="One product URL per line.")

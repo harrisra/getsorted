@@ -356,6 +356,28 @@ export async function populateGroceryItem(
   return response.json()
 }
 
+export interface ScrapeResultRow {
+  url: string
+  status: 'created' | 'error'
+  detail?: string
+  item?: GroceryItem
+  /** Whether the lookup confidently matched the exact product at this URL,
+   * or just the closest thing found in Pepesto's cached catalog — only
+   * present when status is 'created'. */
+  matched_exact?: boolean
+}
+
+// Bulk-creates grocery items from a plain-text list of product URLs (one
+// per line) — each line succeeds or fails independently, see ScrapeResultRow.
+export async function scrapeGroceryItems(urls: string): Promise<ScrapeResultRow[]> {
+  const response = await apiFetch('/api/catalog/grocery-items/scrape/', {
+    method: 'POST',
+    body: JSON.stringify({ urls }),
+  })
+  const data = await response.json()
+  return data.results
+}
+
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 
 export interface GroceryItemRef {

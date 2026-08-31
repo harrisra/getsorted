@@ -4,11 +4,13 @@ import {
   ApiError,
   type GroceryItem,
   type GroceryItemInput,
+  type ScrapeResultRow,
   type Store,
   createGroceryItem,
   deleteGroceryItem,
   fetchGroceryItems,
   fetchStores,
+  scrapeGroceryItems,
   updateGroceryItem,
 } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
@@ -44,6 +46,11 @@ export function GroceryItemsPage() {
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
+  const [showScrapeForm, setShowScrapeForm] = useState(false)
+  const [scrapeUrls, setScrapeUrls] = useState('')
+  const [scraping, setScraping] = useState(false)
+  const [scrapeResults, setScrapeResults] = useState<ScrapeResultRow[] | null>(null)
+  const [scrapeError, setScrapeError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function refresh() {
@@ -182,6 +189,27 @@ export function GroceryItemsPage() {
     }
   }
 
+  async function handleScrape() {
+    const urls = scrapeUrls.trim()
+    if (!urls) return
+    setScrapeError(null)
+    setScrapeResults(null)
+    setScraping(true)
+    try {
+      const results = await scrapeGroceryItems(urls)
+      setScrapeResults(results)
+      await refresh()
+    } catch (err) {
+      setScrapeError(
+        err instanceof ApiError
+          ? Object.values(err.fieldErrors).flat().join(' ')
+          : 'Could not scrape those URLs. Please try again.',
+      )
+    } finally {
+      setScraping(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-[58.8rem] space-y-6 p-4 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -245,6 +273,15 @@ export function GroceryItemsPage() {
               }
             }}
           />
+          {!showScrapeForm && (
+            <button
+              type="button"
+              onClick={() => setShowScrapeForm(true)}
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Scrape URLs
+            </button>
+          )}
           {!showAddForm && (
             <button
               type="button"
@@ -265,6 +302,78 @@ export function GroceryItemsPage() {
 
       {deleteMessage && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteMessage}</p>
+      )}
+
+      {showScrapeForm && (
+        <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+          <div>
+            <span className="text-sm font-medium text-slate-700">Scrape from URLs</span>
+            <p className="text-xs text-slate-500">
+              Paste one product URL per line — each is looked up and added to the catalog
+              automatically. Best-effort: some matches may not be the exact product at that URL.
+            </p>
+          </div>
+          <textarea
+            rows={5}
+            placeholder={'https://www.sainsburys.co.uk/groceries/product/…\nhttps://www.tesco.com/groceries/en-GB/products/…'}
+            value={scrapeUrls}
+            onChange={(e) => setScrapeUrls(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs focus:border-slate-500 focus:outline-none"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleScrape}
+              disabled={scraping || !scrapeUrls.trim()}
+              className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+            >
+              {scraping ? 'Scraping…' : 'Scrape'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowScrapeForm(false)
+                setScrapeResults(null)
+                setScrapeError(null)
+              }}
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Close
+            </button>
+          </div>
+          {scrapeError && <p className="text-sm text-red-600">{scrapeError}</p>}
+          {scrapeResults && (
+            <ul className="divide-y divide-slate-200 overflow-hidden rounded-md border border-slate-200 text-sm">
+              {scrapeResults.map((row) => (
+                <li key={row.url} className="flex items-start gap-2 px-3 py-2">
+                  <span
+                    className={`shrink-0 font-medium ${
+                      row.status === 'created' ? 'text-green-700' : 'text-red-600'
+                    }`}
+                  >
+                    {row.status === 'created' ? '✓' : '✗'}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-slate-700">{row.url}</p>
+                    {row.status === 'created' ? (
+                      <p className="text-xs text-slate-500">
+                        Added "{row.item?.name}"
+                        {row.matched_exact === false && (
+                          <span className="text-amber-600">
+                            {' '}
+                            — best-effort match, please double-check the details
+                          </span>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-red-500">{row.detail}</p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {showAddForm && (
