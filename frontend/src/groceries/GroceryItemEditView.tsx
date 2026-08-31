@@ -31,6 +31,7 @@ export function GroceryItemEditView({
             store: item.store,
             name: item.name,
             brand: item.brand,
+            aisle: item.aisle,
             grams: item.grams,
             pieces: item.pieces,
             milliliters: item.milliliters,

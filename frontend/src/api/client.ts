@@ -232,12 +232,53 @@ export interface Store {
   name: string
 }
 
+export type Aisle =
+  | 'fruit_veg'
+  | 'bakery'
+  | 'meat_fish'
+  | 'dairy_eggs'
+  | 'chilled_ready_meals'
+  | 'frozen'
+  | 'tins_packets'
+  | 'pasta_rice_world_foods'
+  | 'sauces_oils_seasonings'
+  | 'breakfast_spreads'
+  | 'snacks_sweets'
+  | 'tea_coffee_soft_drinks'
+  | 'alcohol'
+  | 'free_from_vegan'
+  | 'baby_pet'
+  | 'household_cleaning'
+  | 'toiletries_health'
+
+export const AISLE_OPTIONS: { value: Aisle; label: string }[] = [
+  { value: 'fruit_veg', label: 'Fruit & Veg' },
+  { value: 'bakery', label: 'Bakery' },
+  { value: 'meat_fish', label: 'Meat & Fish' },
+  { value: 'dairy_eggs', label: 'Dairy & Eggs' },
+  { value: 'chilled_ready_meals', label: 'Chilled & Ready Meals' },
+  { value: 'frozen', label: 'Frozen' },
+  { value: 'tins_packets', label: 'Tins & Packets' },
+  { value: 'pasta_rice_world_foods', label: 'Pasta Rice & World Foods' },
+  { value: 'sauces_oils_seasonings', label: 'Sauces Oils & Seasonings' },
+  { value: 'breakfast_spreads', label: 'Breakfast & Spreads' },
+  { value: 'snacks_sweets', label: 'Snacks & Sweets' },
+  { value: 'tea_coffee_soft_drinks', label: 'Tea Coffee & Soft Drinks' },
+  { value: 'alcohol', label: 'Alcohol' },
+  { value: 'free_from_vegan', label: 'Free From & Vegan' },
+  { value: 'baby_pet', label: 'Baby & Pet' },
+  { value: 'household_cleaning', label: 'Household & Cleaning' },
+  { value: 'toiletries_health', label: 'Toiletries & Health' },
+]
+
 export interface GroceryItem {
   id: string
   store: string
   store_detail: Store
   name: string
   brand: string
+  // Which supermarket aisle this is shelved in — optional, '' means unset.
+  aisle: Aisle | ''
   grams: number | null
   pieces: number | null
   milliliters: number | null

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  AISLE_OPTIONS,
   ApiError,
   type GroceryItem,
   type GroceryItemInput,
@@ -16,6 +17,10 @@ import { PencilIcon } from '../icons'
 import { GroceryItemEditView } from './GroceryItemEditView'
 import { GroceryItemForm } from './GroceryItemForm'
 import { downloadGroceryItemsAsJson, parseImportFiles } from './groceryItemExport'
+
+function aisleLabel(item: GroceryItem): string | null {
+  return AISLE_OPTIONS.find((a) => a.value === item.aisle)?.label ?? null
+}
 
 function formatSize(item: GroceryItem): string {
   return [
@@ -323,7 +328,7 @@ export function GroceryItemsPage() {
                   {item.store_detail.name} — {item.name}
                 </p>
                 <p className="truncate text-sm text-slate-500">
-                  {[item.brand, formatSize(item)].filter(Boolean).join(' · ')}
+                  {[item.brand, formatSize(item), aisleLabel(item)].filter(Boolean).join(' · ')}
                   {item.price && ` · £${item.price}`}
                   {item.product_url && (
                     <>

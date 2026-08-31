@@ -27,6 +27,7 @@ class GroceryItemSerializer(serializers.ModelSerializer):
             "store_detail",
             "name",
             "brand",
+            "aisle",
             "grams",
             "pieces",
             "milliliters",

@@ -11,6 +11,16 @@ class StoreAdmin(admin.ModelAdmin):
 
 @admin.register(GroceryItem)
 class GroceryItemAdmin(admin.ModelAdmin):
-    list_display = ["name", "store", "brand", "grams", "pieces", "milliliters", "price", "created_by"]
-    list_filter = ["store"]
+    list_display = [
+        "name",
+        "store",
+        "brand",
+        "aisle",
+        "grams",
+        "pieces",
+        "milliliters",
+        "price",
+        "created_by",
+    ]
+    list_filter = ["store", "aisle"]
     search_fields = ["name", "brand", "store__name"]

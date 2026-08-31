@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError, type GroceryItemInput, type Store, fetchStores, populateGroceryItem } from '../api/client'
+import {
+  AISLE_OPTIONS,
+  ApiError,
+  type GroceryItemInput,
+  type Store,
+  fetchStores,
+  populateGroceryItem,
+} from '../api/client'
 
 const EMPTY: GroceryItemInput = {
   store: '',
   name: '',
   brand: '',
+  aisle: '',
   grams: null,
   pieces: null,
   milliliters: null,
@@ -172,6 +180,21 @@ export function GroceryItemForm({
         </label>
         <Field label="Name" required value={values.name} onChange={(v) => set('name', v)} />
         <Field label="Brand" value={values.brand} onChange={(v) => set('brand', v)} />
+        <label className="space-y-1 text-sm">
+          <span className="font-medium text-slate-700">Aisle</span>
+          <select
+            value={values.aisle}
+            onChange={(e) => set('aisle', e.target.value as GroceryItemInput['aisle'])}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          >
+            <option value="">No aisle</option>
+            {AISLE_OPTIONS.map((aisle) => (
+              <option key={aisle.value} value={aisle.value}>
+                {aisle.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="space-y-1 text-sm">
           <span className="font-medium text-slate-700">Grams</span>
           <input

@@ -1,4 +1,4 @@
-import type { GroceryItem, GroceryItemInput, Store } from '../api/client'
+import { AISLE_OPTIONS, type Aisle, type GroceryItem, type GroceryItemInput, type Store } from '../api/client'
 
 // The portable shape used for export/import files. Store is the chain's
 // NAME rather than its internal id — the id is only meaningful within this
@@ -8,6 +8,7 @@ export interface ExportedGroceryItem {
   store: string
   name: string
   brand: string
+  aisle: Aisle | ''
   grams: number | null
   pieces: number | null
   milliliters: number | null
@@ -21,6 +22,7 @@ function toExportedGroceryItem(item: GroceryItem): ExportedGroceryItem {
     store: item.store_detail.name,
     name: item.name,
     brand: item.brand,
+    aisle: item.aisle,
     grams: item.grams,
     pieces: item.pieces,
     milliliters: item.milliliters,
@@ -69,10 +71,16 @@ function toGroceryItemInput(item: unknown, stores: Store[]): GroceryItemInput | 
   const store = stores.find((s) => s.name.toLowerCase() === storeName.trim().toLowerCase())
   if (!store) return null
 
+  const aisle =
+    typeof item.aisle === 'string' && AISLE_OPTIONS.some((a) => a.value === item.aisle)
+      ? (item.aisle as Aisle)
+      : ''
+
   return {
     store: store.id,
     name: item.name,
     brand: typeof item.brand === 'string' ? item.brand : '',
+    aisle,
     grams: typeof item.grams === 'number' ? item.grams : null,
     pieces: typeof item.pieces === 'number' ? item.pieces : null,
     milliliters: typeof item.milliliters === 'number' ? item.milliliters : null,

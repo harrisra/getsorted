@@ -22,6 +22,26 @@ class Store(models.Model):
         return self.name
 
 
+class Aisle(models.TextChoices):
+    FRUIT_VEG = "fruit_veg", "Fruit & Veg"
+    BAKERY = "bakery", "Bakery"
+    MEAT_FISH = "meat_fish", "Meat & Fish"
+    DAIRY_EGGS = "dairy_eggs", "Dairy & Eggs"
+    CHILLED_READY_MEALS = "chilled_ready_meals", "Chilled & Ready Meals"
+    FROZEN = "frozen", "Frozen"
+    TINS_PACKETS = "tins_packets", "Tins & Packets"
+    PASTA_RICE_WORLD_FOODS = "pasta_rice_world_foods", "Pasta Rice & World Foods"
+    SAUCES_OILS_SEASONINGS = "sauces_oils_seasonings", "Sauces Oils & Seasonings"
+    BREAKFAST_SPREADS = "breakfast_spreads", "Breakfast & Spreads"
+    SNACKS_SWEETS = "snacks_sweets", "Snacks & Sweets"
+    TEA_COFFEE_SOFT_DRINKS = "tea_coffee_soft_drinks", "Tea Coffee & Soft Drinks"
+    ALCOHOL = "alcohol", "Alcohol"
+    FREE_FROM_VEGAN = "free_from_vegan", "Free From & Vegan"
+    BABY_PET = "baby_pet", "Baby & Pet"
+    HOUSEHOLD_CLEANING = "household_cleaning", "Household & Cleaning"
+    TOILETRIES_HEALTH = "toiletries_health", "Toiletries & Health"
+
+
 class GroceryItem(models.Model):
     """A store-bought product in the shared, app-wide grocery catalog.
 
@@ -34,6 +54,9 @@ class GroceryItem(models.Model):
     store = models.ForeignKey(Store, on_delete=models.PROTECT, related_name="grocery_items")
     name = models.CharField(max_length=255)
     brand = models.CharField(max_length=255, blank=True)
+    # Which supermarket aisle this is shelved in — optional, so existing/
+    # quickly-added items aren't forced to pick one.
+    aisle = models.CharField(max_length=30, choices=Aisle.choices, blank=True)
     # At least one of these must be set — enforced in the serializer, since
     # any one alone is a valid way to describe a product's size.
     grams = models.PositiveIntegerField(null=True, blank=True)
