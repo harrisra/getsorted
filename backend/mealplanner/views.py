@@ -239,7 +239,9 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
 
         slots = MealSlot.objects.filter(
             meal_plan__household=shopping_list.household, date__in=parsed_dates
-        ).prefetch_related("recipes__ingredients")
+        ).prefetch_related(
+            "recipes__ingredients__store_options__grocery_item",
+        )
 
         # Normalized ingredient name -> [(ingredient, meal_plan_id), ...]
         groups = {}
@@ -261,8 +263,35 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
             meal_plan_ids = {mp_id for _, mp_id in entries}
             meal_plan_id = meal_plan_ids.pop() if len(meal_plan_ids) == 1 else None
 
+            # Default the matched product to whichever store option is
+            # cheapest across every ingredient contributing to this line —
+            # the same match already used for the recipe's own cost
+            # calculation (see RecipeIngredient.line_cost) — so a generated
+            # item shows a cost straight away instead of only after the user
+            # re-picks a product from the dropdown. Only ever set on create;
+            # merging into an existing item never touches its match (see
+            # add_or_merge_shopping_list_item).
+            priced_options = [
+                option
+                for ingredient, _ in entries
+                for option in ingredient.store_options.all()
+                if option.line_cost is not None
+            ]
+            grocery_item = (
+                min(priced_options, key=lambda option: option.line_cost).grocery_item
+                if priced_options
+                else None
+            )
+
             item, _created = add_or_merge_shopping_list_item(
-                shopping_list, display_name, grams, pieces, milliliters, meal_plan_id, request.user
+                shopping_list,
+                display_name,
+                grams,
+                pieces,
+                milliliters,
+                meal_plan_id,
+                request.user,
+                grocery_item=grocery_item,
             )
             affected.append(item)
 

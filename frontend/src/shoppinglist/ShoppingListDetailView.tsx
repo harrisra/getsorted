@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   ApiError,
@@ -50,6 +50,21 @@ function parseAmount(value: string): number | null {
   return value.trim() !== '' && Number.isFinite(n) && n > 0 ? Math.trunc(n) : null
 }
 
+// Background/border classes for the product dropdown: pale green when the
+// selected match is the cheapest priced option available, pale red when a
+// cheaper one exists instead. Neutral (default) when there's nothing to
+// compare — a single match, or no priced matches at all.
+function selectPriceClasses(matches: GroceryItem[], selectedId: string): string {
+  const priced = matches.filter((gi) => gi.price != null)
+  if (priced.length < 2) return 'border-slate-300'
+  const cheapest = Math.min(...priced.map((gi) => Number(gi.price)))
+  const selected = matches.find((gi) => gi.id === selectedId)
+  if (selected?.price == null) return 'border-slate-300'
+  return Number(selected.price) <= cheapest
+    ? 'border-green-300 bg-green-50'
+    : 'border-red-300 bg-red-50'
+}
+
 // Cost of buying enough packs of the matched product to cover this row —
 // packs_needed times the pack price. Null unless both are known (i.e. a
 // grocery item is actually matched and priced).
@@ -62,6 +77,63 @@ function rowCost(item: ShoppingListItem): number | null {
 function formatRowCost(item: ShoppingListItem): string | null {
   const cost = rowCost(item)
   return cost != null ? `£${cost.toFixed(2)}` : null
+}
+
+type SortMode = 'alpha' | 'price' | 'store'
+
+const SORT_MODE_LABELS: Record<SortMode, string> = {
+  alpha: 'A–Z',
+  price: 'Price',
+  store: 'Store',
+}
+
+interface EnrichedItem {
+  item: ShoppingListItem
+  matches: GroceryItem[]
+  effectiveGroceryItemId: string
+  // The store of whichever product this item would actually be bought as —
+  // its saved match, or (nothing chosen yet) the same default-to-cheapest
+  // match shown in the dropdown. Used for the "grouped by store" sort so
+  // items group under the store they'll really be bought from, not just
+  // the ones with an explicitly saved match.
+  effectiveStore: string | null
+}
+
+function enrichItems(items: ShoppingListItem[], groceryItems: GroceryItem[]): EnrichedItem[] {
+  return items.map((item) => {
+    const matches = matchingGroceryItems(item.name, groceryItems)
+    const effective = matches.find((gi) => gi.id === item.grocery_item) ?? matches[0]
+    return {
+      item,
+      matches,
+      effectiveGroceryItemId: item.grocery_item ?? (matches[0]?.id ?? ''),
+      effectiveStore: effective?.store_detail.name ?? null,
+    }
+  })
+}
+
+// Unchecked items always sort before checked ones, regardless of mode —
+// only the ordering within those two groups changes.
+function sortEnriched(enriched: EnrichedItem[], mode: SortMode): EnrichedItem[] {
+  const sorted = [...enriched]
+  sorted.sort((a, b) => {
+    if (a.item.is_checked !== b.item.is_checked) return a.item.is_checked ? 1 : -1
+    if (mode === 'alpha') return a.item.name.localeCompare(b.item.name)
+    if (mode === 'price') {
+      // Costliest first — items with no known cost sort to the end.
+      return (rowCost(b.item) ?? -1) - (rowCost(a.item) ?? -1)
+    }
+    // Items with no matched product at all (nothing to group by) sort last.
+    if (a.effectiveStore == null && b.effectiveStore == null) {
+      return a.item.name.localeCompare(b.item.name)
+    }
+    if (a.effectiveStore == null) return 1
+    if (b.effectiveStore == null) return -1
+    return a.effectiveStore !== b.effectiveStore
+      ? a.effectiveStore.localeCompare(b.effectiveStore)
+      : a.item.name.localeCompare(b.item.name)
+  })
+  return sorted
 }
 
 // A dedicated screen for one shopping list — its "generate from planned
@@ -85,6 +157,7 @@ export function ShoppingListDetailView({
   const [newItemMilliliters, setNewItemMilliliters] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
   const [addingItem, setAddingItem] = useState(false)
+  const [sortMode, setSortMode] = useState<SortMode>('alpha')
 
   async function refresh() {
     setItems(await fetchShoppingListItems())
@@ -100,6 +173,7 @@ export function ShoppingListDetailView({
   // price) — items with no match/no price simply don't contribute, rather
   // than treating "unknown" as £0.
   const totalCost = visibleItems?.reduce((sum, item) => sum + (rowCost(item) ?? 0), 0) ?? 0
+  const sortedItems = visibleItems ? sortEnriched(enrichItems(visibleItems, groceryItems), sortMode) : null
 
   // Today through the next 6 days — the window generation can draw from.
   const next7Days = Array.from({ length: 7 }, (_, i) => formatDateISO(addDays(new Date(), i)))
@@ -278,68 +352,101 @@ export function ShoppingListDetailView({
         <p className="text-sm text-slate-500">Nothing on this list yet.</p>
       )}
 
-      <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        {visibleItems?.map((item) => {
-          const matches = matchingGroceryItems(item.name, groceryItems)
-          // Nothing explicitly chosen yet — default to the cheapest match,
-          // recomputed live each render so it keeps tracking whichever
-          // match is currently cheapest until the user picks one themself.
-          const effectiveGroceryItemId = item.grocery_item ?? (matches[0]?.id ?? '')
+      {visibleItems !== null && visibleItems.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-700">Sort by:</span>
+          {(Object.keys(SORT_MODE_LABELS) as SortMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setSortMode(mode)}
+              className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
+                sortMode === mode
+                  ? 'border-slate-800 bg-slate-800 text-white'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              {SORT_MODE_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+      )}
 
-          return (
-            <li key={item.id} className="flex items-center justify-between gap-3 px-4 py-3">
-              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={item.is_checked}
-                  onChange={() => handleToggleChecked(item)}
-                  className="h-4 w-4 shrink-0 rounded border-slate-300"
-                />
-                <span
-                  className={`min-w-0 truncate text-sm ${
-                    item.is_checked ? 'text-slate-400 line-through' : 'text-slate-800'
-                  }`}
-                >
-                  {item.name}
-                </span>
-              </label>
-              <div className="flex shrink-0 items-center gap-3">
-                {/* Raw amount needed, to the left of the product dropdown.
-                    Fixed-width and always rendered (even empty) so this
-                    column lines up between rows regardless of whether a
-                    given item has anything to show in it. */}
-                <span className="w-20 shrink-0 text-xs text-slate-500">{formatAmount(item) ?? ''}</span>
-                <div className="w-64 shrink-0">
-                  {matches.length > 0 && (
-                    <select
-                      value={effectiveGroceryItemId}
-                      onChange={(e) => handleChangeGroceryItem(item.id, e.target.value)}
-                      aria-label={`Choose which product to buy for ${item.name}`}
-                      className="w-full rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 focus:border-slate-500 focus:outline-none"
+      <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
+        {(() => {
+          let lastStoreHeading: string | undefined
+          return sortedItems?.map(({ item, matches, effectiveGroceryItemId, effectiveStore }) => {
+            // In "grouped by store" mode, drop in a heading row each time
+            // the store changes — items with no matched product at all fall
+            // under a trailing "Unmatched" heading rather than being hidden.
+            const showStoreHeading = sortMode === 'store' && effectiveStore !== lastStoreHeading
+            if (sortMode === 'store') lastStoreHeading = effectiveStore ?? undefined
+
+            return (
+              <Fragment key={item.id}>
+                {showStoreHeading && (
+                  <li className="bg-slate-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {effectiveStore ?? 'Unmatched'}
+                  </li>
+                )}
+                <li className="flex items-center justify-between gap-3 px-4 py-3">
+                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={item.is_checked}
+                      onChange={() => handleToggleChecked(item)}
+                      className="h-4 w-4 shrink-0 rounded border-slate-300"
+                    />
+                    <span
+                      className={`min-w-0 truncate text-sm ${
+                        item.is_checked ? 'text-slate-400 line-through' : 'text-slate-800'
+                      }`}
                     >
-                      {matches.map((gi) => (
-                        <option key={gi.id} value={gi.id}>
-                          {gi.store_detail.name} — {gi.name}
-                          {gi.price ? ` — £${gi.price}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                {/* Packs needed of the matched product, to the right of the
-                    dropdown. */}
-                <span className="w-10 shrink-0 text-xs text-slate-500">
-                  {item.packs_needed != null ? `× ${item.packs_needed}` : ''}
-                </span>
-                {/* Total cost for this row: packs needed × pack price. */}
-                <span className="w-16 shrink-0 text-right text-sm font-medium text-slate-700">
-                  {formatRowCost(item) ?? ''}
-                </span>
-                <ConfirmDeleteButton label="Remove item" onConfirm={() => handleDelete(item.id)} />
-              </div>
-            </li>
-          )
-        })}
+                      {item.name}
+                    </span>
+                  </label>
+                  <div className="flex shrink-0 items-center gap-3">
+                    {/* Raw amount needed, to the left of the product
+                        dropdown. Fixed-width and always rendered (even
+                        empty) so this column lines up between rows
+                        regardless of whether a given item has anything to
+                        show in it. */}
+                    <span className="w-20 shrink-0 text-xs text-slate-500">
+                      {formatAmount(item) ?? ''}
+                    </span>
+                    <div className="w-64 shrink-0">
+                      {matches.length > 0 && (
+                        <select
+                          value={effectiveGroceryItemId}
+                          onChange={(e) => handleChangeGroceryItem(item.id, e.target.value)}
+                          aria-label={`Choose which product to buy for ${item.name}`}
+                          className={`w-full rounded-md border px-2 py-1 text-xs text-slate-700 focus:border-slate-500 focus:outline-none ${selectPriceClasses(matches, effectiveGroceryItemId)}`}
+                        >
+                          {matches.map((gi) => (
+                            <option key={gi.id} value={gi.id}>
+                              {gi.store_detail.name} — {gi.name}
+                              {gi.price ? ` — £${gi.price}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    {/* Packs needed of the matched product, to the right of
+                        the dropdown. */}
+                    <span className="w-10 shrink-0 text-xs text-slate-500">
+                      {item.packs_needed != null ? `× ${item.packs_needed}` : ''}
+                    </span>
+                    {/* Total cost for this row: packs needed × pack price. */}
+                    <span className="w-16 shrink-0 text-right text-sm font-medium text-slate-700">
+                      {formatRowCost(item) ?? ''}
+                    </span>
+                    <ConfirmDeleteButton label="Remove item" onConfirm={() => handleDelete(item.id)} />
+                  </div>
+                </li>
+              </Fragment>
+            )
+          })
+        })()}
       </ul>
 
       {visibleItems !== null && visibleItems.length > 0 && (
