@@ -53,10 +53,15 @@ function parseAmount(value: string): number | null {
 // Cost of buying enough packs of the matched product to cover this row —
 // packs_needed times the pack price. Null unless both are known (i.e. a
 // grocery item is actually matched and priced).
-function formatRowCost(item: ShoppingListItem): string | null {
+function rowCost(item: ShoppingListItem): number | null {
   const price = item.grocery_item_detail?.price
   if (item.packs_needed == null || price == null) return null
-  return `£${(Number(price) * item.packs_needed).toFixed(2)}`
+  return Number(price) * item.packs_needed
+}
+
+function formatRowCost(item: ShoppingListItem): string | null {
+  const cost = rowCost(item)
+  return cost != null ? `£${cost.toFixed(2)}` : null
 }
 
 // A dedicated screen for one shopping list — its "generate from planned
@@ -91,6 +96,10 @@ export function ShoppingListDetailView({
   }, [])
 
   const visibleItems = items?.filter((item) => item.shopping_list === list.id) ?? null
+  // Sum of every row's cost that's actually known (matched product with a
+  // price) — items with no match/no price simply don't contribute, rather
+  // than treating "unknown" as £0.
+  const totalCost = visibleItems?.reduce((sum, item) => sum + (rowCost(item) ?? 0), 0) ?? 0
 
   // Today through the next 6 days — the window generation can draw from.
   const next7Days = Array.from({ length: 7 }, (_, i) => formatDateISO(addDays(new Date(), i)))
@@ -295,42 +304,49 @@ export function ShoppingListDetailView({
                 </span>
               </label>
               <div className="flex shrink-0 items-center gap-3">
-                {/* Raw amount needed, to the left of the product dropdown. */}
-                {formatAmount(item) != null && (
-                  <span className="w-20 shrink-0 text-xs text-slate-500">{formatAmount(item)}</span>
-                )}
-                {matches.length > 0 && (
-                  <select
-                    value={effectiveGroceryItemId}
-                    onChange={(e) => handleChangeGroceryItem(item.id, e.target.value)}
-                    aria-label={`Choose which product to buy for ${item.name}`}
-                    className="max-w-[16rem] rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 focus:border-slate-500 focus:outline-none"
-                  >
-                    {matches.map((gi) => (
-                      <option key={gi.id} value={gi.id}>
-                        {gi.store_detail.name} — {gi.name}
-                        {gi.price ? ` — £${gi.price}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                {/* Raw amount needed, to the left of the product dropdown.
+                    Fixed-width and always rendered (even empty) so this
+                    column lines up between rows regardless of whether a
+                    given item has anything to show in it. */}
+                <span className="w-20 shrink-0 text-xs text-slate-500">{formatAmount(item) ?? ''}</span>
+                <div className="w-64 shrink-0">
+                  {matches.length > 0 && (
+                    <select
+                      value={effectiveGroceryItemId}
+                      onChange={(e) => handleChangeGroceryItem(item.id, e.target.value)}
+                      aria-label={`Choose which product to buy for ${item.name}`}
+                      className="w-full rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 focus:border-slate-500 focus:outline-none"
+                    >
+                      {matches.map((gi) => (
+                        <option key={gi.id} value={gi.id}>
+                          {gi.store_detail.name} — {gi.name}
+                          {gi.price ? ` — £${gi.price}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
                 {/* Packs needed of the matched product, to the right of the
                     dropdown. */}
-                {item.packs_needed != null && (
-                  <span className="w-10 shrink-0 text-xs text-slate-500">× {item.packs_needed}</span>
-                )}
+                <span className="w-10 shrink-0 text-xs text-slate-500">
+                  {item.packs_needed != null ? `× ${item.packs_needed}` : ''}
+                </span>
                 {/* Total cost for this row: packs needed × pack price. */}
-                {formatRowCost(item) != null && (
-                  <span className="w-16 shrink-0 text-right text-sm font-medium text-slate-700">
-                    {formatRowCost(item)}
-                  </span>
-                )}
+                <span className="w-16 shrink-0 text-right text-sm font-medium text-slate-700">
+                  {formatRowCost(item) ?? ''}
+                </span>
                 <ConfirmDeleteButton label="Remove item" onConfirm={() => handleDelete(item.id)} />
               </div>
             </li>
           )
         })}
       </ul>
+
+      {visibleItems !== null && visibleItems.length > 0 && (
+        <p className="text-right text-sm font-semibold text-slate-800">
+          Total: £{totalCost.toFixed(2)}
+        </p>
+      )}
     </div>
   )
 }
