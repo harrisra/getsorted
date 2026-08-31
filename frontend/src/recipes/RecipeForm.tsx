@@ -12,6 +12,24 @@ import { TrashIcon } from '../icons'
 import { GroceryItemCombobox } from './GroceryItemCombobox'
 
 type RecipeFormValues = Omit<RecipeInput, 'household'>
+type IngredientQuantity = Pick<RecipeIngredientInput, 'grams' | 'pieces' | 'milliliters'>
+
+// Mirrors the backend's RecipeIngredientStoreOption.line_cost exactly, so a
+// just-added match shows its cost immediately rather than only after
+// saving: the matched item's price, scaled by whichever unit
+// (grams/milliliters/pieces) both the ingredient and the item share.
+function lineCost(item: GroceryItem, ingredient: IngredientQuantity): number | null {
+  if (item.price == null) return null
+  const price = Number(item.price)
+  for (const dimension of ['grams', 'milliliters', 'pieces'] as const) {
+    const itemAmount = item[dimension]
+    const ingredientAmount = ingredient[dimension]
+    if (itemAmount && ingredientAmount != null) {
+      return Math.round(price * (ingredientAmount / itemAmount) * 100) / 100
+    }
+  }
+  return null
+}
 
 const EMPTY: RecipeFormValues = {
   name: '',
@@ -358,30 +376,42 @@ export function RecipeForm({
                 </button>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 pl-1">
-                <span className="shrink-0 text-xs font-medium text-slate-500">
-                  Store matches:
-                </span>
+              <div className="space-y-1 pl-4">
+                <span className="text-xs font-medium text-slate-500">Store matches</span>
                 {ingredient.store_options.map((option) => {
                   const item = groceryItems.find((gi) => gi.id === option.grocery_item)
+                  const cost = item ? lineCost(item, ingredient) : null
                   return (
-                    <span
+                    <div
                       key={option.grocery_item}
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                      className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2 py-1 text-xs"
                     >
-                      {item
-                        ? `${item.store_detail.name}: ${item.name}${item.price ? ` (£${item.price})` : ''}`
-                        : 'Unknown item'}
-                      <button
-                        type="button"
-                        onClick={() => removeStoreOption(index, option.grocery_item)}
-                        title="Remove match"
-                        aria-label="Remove match"
-                        className="text-slate-400 hover:text-red-600"
-                      >
-                        ✕
-                      </button>
-                    </span>
+                      <span className="min-w-0 truncate text-slate-700">
+                        {item ? (
+                          <>
+                            <span className="font-medium">{item.store_detail.name}</span>
+                            {' — '}
+                            {item.name}
+                          </>
+                        ) : (
+                          'Unknown item'
+                        )}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="font-medium text-slate-700">
+                          {cost != null ? `£${cost.toFixed(2)}` : '—'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeStoreOption(index, option.grocery_item)}
+                          title="Remove match"
+                          aria-label="Remove match"
+                          className="text-slate-400 hover:text-red-600"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    </div>
                   )
                 })}
                 <GroceryItemCombobox
