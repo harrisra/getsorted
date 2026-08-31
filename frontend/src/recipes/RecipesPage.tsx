@@ -333,21 +333,6 @@ export function RecipesPage() {
                   <p className="truncate font-medium text-slate-800">{recipe.name}</p>
                   <p className="text-sm text-slate-500">
                     {MEAL_TYPE_LABELS[recipe.meal_type]} · Feeds {recipe.servings}
-                    {recipe.current_cost && (
-                      <>
-                        {' · '}
-                        <span className="font-medium text-slate-700">
-                          £{recipe.current_cost}
-                        </span>
-                        {pricedIngredientCount(recipe) < recipe.ingredients.length && (
-                          <span className="text-slate-400">
-                            {' '}
-                            (based on {pricedIngredientCount(recipe)} of{' '}
-                            {recipe.ingredients.length} ingredients)
-                          </span>
-                        )}
-                      </>
-                    )}
                     {recipe.source_url && (
                       <>
                         {' · '}
@@ -364,22 +349,43 @@ export function RecipesPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex shrink-0 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setEditingId(recipe.id)}
-                  title="Edit"
-                  aria-label="Edit"
-                  className="text-slate-500 hover:text-slate-900"
-                >
-                  <PencilIcon className="h-4 w-4" />
-                </button>
-                {canDelete(recipe) && (
-                  <ConfirmDeleteButton
-                    label="Remove recipe"
-                    onConfirm={() => handleDelete(recipe.id)}
-                  />
-                )}
+              {/* Cost column + edit/delete buttons grouped together so
+                  "justify-between" on the row only splits it into two
+                  parts (info on the left, this group flush right) — with
+                  three separate flex children it would spread the cost
+                  column out to sit between them instead. */}
+              <div className="flex shrink-0 items-center gap-4">
+                {/* Total cost column, right-aligned in a large font,
+                    immediately before the edit/delete buttons. */}
+                <div className="w-28 shrink-0 text-right">
+                  {recipe.current_cost && (
+                    <>
+                      <p className="text-2xl font-semibold text-slate-800">£{recipe.current_cost}</p>
+                      {pricedIngredientCount(recipe) < recipe.ingredients.length && (
+                        <p className="text-xs text-slate-400">
+                          {pricedIngredientCount(recipe)} of {recipe.ingredients.length} priced
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="flex shrink-0 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(recipe.id)}
+                    title="Edit"
+                    aria-label="Edit"
+                    className="text-slate-500 hover:text-slate-900"
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                  </button>
+                  {canDelete(recipe) && (
+                    <ConfirmDeleteButton
+                      label="Remove recipe"
+                      onConfirm={() => handleDelete(recipe.id)}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </li>

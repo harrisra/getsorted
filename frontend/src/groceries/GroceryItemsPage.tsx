@@ -324,9 +324,7 @@ export function GroceryItemsPage() {
                 />
               )}
               <div className="min-w-0">
-                <p className="truncate font-medium text-slate-800">
-                  {item.store_detail.name} — {item.name}
-                </p>
+                <p className="truncate font-medium text-slate-800">{item.name}</p>
                 <p className="truncate text-sm text-slate-500">
                   {[item.brand, formatSize(item), aisleLabel(item)].filter(Boolean).join(' · ')}
                   {item.price && ` · £${item.price}`}
@@ -347,6 +345,9 @@ export function GroceryItemsPage() {
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-3">
+              <span className="w-24 shrink-0 truncate text-sm text-slate-600" title={item.store_detail.name}>
+                {item.store_detail.name}
+              </span>
               <span
                 className="max-w-[10rem] truncate text-xs text-slate-400"
                 title={item.created_by_email ?? undefined}
