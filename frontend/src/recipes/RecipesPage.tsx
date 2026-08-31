@@ -32,6 +32,7 @@ export function RecipesPage() {
   const { currentHousehold } = useHouseholds()
   const [recipes, setRecipes] = useState<Recipe[] | null>(null)
   const [mealTypeFilter, setMealTypeFilter] = useState<Recipe['meal_type'] | ''>('')
+  const [textFilter, setTextFilter] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -58,8 +59,16 @@ export function RecipesPage() {
 
   const visibleRecipes = recipes?.filter((r) => r.household === householdId) ?? null
   const editingRecipe = editingId ? (visibleRecipes?.find((r) => r.id === editingId) ?? null) : null
+  const trimmedTextFilter = textFilter.trim().toLowerCase()
   const filteredRecipes =
-    visibleRecipes?.filter((r) => !mealTypeFilter || r.meal_type === mealTypeFilter) ?? null
+    visibleRecipes?.filter((r) => {
+      if (mealTypeFilter && r.meal_type !== mealTypeFilter) return false
+      if (trimmedTextFilter) {
+        const haystack = [r.name, ...r.ingredients.map((ing) => ing.name)].join(' ').toLowerCase()
+        if (!haystack.includes(trimmedTextFilter)) return false
+      }
+      return true
+    }) ?? null
   const allSelected =
     !!filteredRecipes && filteredRecipes.length > 0 && filteredRecipes.every((r) => selectedIds.has(r.id))
 
@@ -177,6 +186,14 @@ export function RecipesPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold text-slate-800">Recipes</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={textFilter}
+            onChange={(e) => setTextFilter(e.target.value)}
+            placeholder="Search name, ingredients…"
+            aria-label="Filter by text"
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-slate-500 focus:outline-none"
+          />
           <select
             value={mealTypeFilter}
             onChange={(e) => setMealTypeFilter(e.target.value as Recipe['meal_type'] | '')}
@@ -270,7 +287,7 @@ export function RecipesPage() {
         <p className="text-sm text-slate-500">No recipes yet.</p>
       )}
       {visibleRecipes !== null && visibleRecipes.length > 0 && filteredRecipes?.length === 0 && (
-        <p className="text-sm text-slate-500">No recipes match this meal type.</p>
+        <p className="text-sm text-slate-500">No recipes match your filters.</p>
       )}
 
       {filteredRecipes !== null && filteredRecipes.length > 0 && (

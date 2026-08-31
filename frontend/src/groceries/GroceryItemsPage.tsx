@@ -30,6 +30,7 @@ export function GroceryItemsPage() {
   const [items, setItems] = useState<GroceryItem[] | null>(null)
   const [stores, setStores] = useState<Store[]>([])
   const [storeFilter, setStoreFilter] = useState('')
+  const [textFilter, setTextFilter] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -70,7 +71,20 @@ export function GroceryItemsPage() {
     )
   }
 
-  const filteredItems = items?.filter((item) => !storeFilter || item.store === storeFilter) ?? null
+  const trimmedTextFilter = textFilter.trim().toLowerCase()
+  const filteredItems =
+    items?.filter((item) => {
+      if (storeFilter && item.store !== storeFilter) return false
+      if (
+        trimmedTextFilter &&
+        !`${item.name} ${item.brand} ${item.store_detail.name}`
+          .toLowerCase()
+          .includes(trimmedTextFilter)
+      ) {
+        return false
+      }
+      return true
+    }) ?? null
   const allSelected =
     !!filteredItems && filteredItems.length > 0 && filteredItems.every((i) => selectedIds.has(i.id))
 
@@ -166,6 +180,14 @@ export function GroceryItemsPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold text-slate-800">Grocery items</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={textFilter}
+            onChange={(e) => setTextFilter(e.target.value)}
+            placeholder="Search name, brand, store…"
+            aria-label="Filter by text"
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-slate-500 focus:outline-none"
+          />
           <select
             value={storeFilter}
             onChange={(e) => setStoreFilter(e.target.value)}
@@ -257,7 +279,7 @@ export function GroceryItemsPage() {
         <p className="text-sm text-slate-500">No grocery items yet.</p>
       )}
       {items !== null && items.length > 0 && filteredItems?.length === 0 && (
-        <p className="text-sm text-slate-500">No grocery items for this store.</p>
+        <p className="text-sm text-slate-500">No grocery items match your filters.</p>
       )}
 
       {filteredItems !== null && filteredItems.length > 0 && (
