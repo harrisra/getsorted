@@ -236,6 +236,17 @@ class ShoppingListItem(models.Model):
     )
     name = models.CharField(max_length=255)
     quantity = models.CharField(max_length=100, blank=True)
+    # Which specific catalog product (and so which store) to buy this item
+    # as — picked from whichever GroceryItems name-match `name`, defaulting
+    # to the cheapest. Optional: not every item corresponds to something in
+    # the catalog (e.g. "Birthday candles").
+    grocery_item = models.ForeignKey(
+        "catalog.GroceryItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="shopping_list_items",
+    )
     is_checked = models.BooleanField(default=False)
     added_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True

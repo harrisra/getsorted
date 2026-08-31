@@ -529,6 +529,9 @@ export interface ShoppingListItem {
   meal_plan: string | null
   name: string
   quantity: string
+  /** The specific catalog product (and so store) chosen for this item. */
+  grocery_item: string | null
+  grocery_item_detail: GroceryItemRef | null
   is_checked: boolean
   added_by: string | null
   added_by_email: string | null
@@ -537,7 +540,7 @@ export interface ShoppingListItem {
 
 export type ShoppingListItemInput = Omit<
   ShoppingListItem,
-  'id' | 'added_by' | 'added_by_email' | 'created_at'
+  'id' | 'grocery_item_detail' | 'added_by' | 'added_by_email' | 'created_at'
 >
 
 export async function fetchShoppingListItems(): Promise<ShoppingListItem[]> {

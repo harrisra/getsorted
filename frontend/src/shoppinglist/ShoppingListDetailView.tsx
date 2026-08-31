@@ -2,16 +2,35 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   ApiError,
+  type GroceryItem,
   type ShoppingList,
   type ShoppingListItem,
   createShoppingListItem,
   deleteShoppingListItem,
+  fetchGroceryItems,
   fetchShoppingListItems,
   generateShoppingList,
   updateShoppingListItem,
 } from '../api/client'
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { addDays, formatDateISO, formatDayHeading } from '../mealplanner/dates'
+
+// Catalog items whose name mentions this shopping-list item's name (e.g.
+// "Cheddar" matches "Tesco Mature Cheddar Block 400g"), cheapest first —
+// priced items before unpriced ones, since there's nothing to compare an
+// unpriced item on.
+function matchingGroceryItems(itemName: string, groceryItems: GroceryItem[]): GroceryItem[] {
+  const needle = itemName.trim().toLowerCase()
+  if (!needle) return []
+  return groceryItems
+    .filter((gi) => gi.name.toLowerCase().includes(needle))
+    .sort((a, b) => {
+      if (a.price == null && b.price == null) return 0
+      if (a.price == null) return 1
+      if (b.price == null) return -1
+      return Number(a.price) - Number(b.price)
+    })
+}
 
 // A dedicated screen for one shopping list — its "generate from planned
 // meals" controls and its items — rather than a single page trying to
@@ -24,6 +43,7 @@ export function ShoppingListDetailView({
   onBack: () => void
 }) {
   const [items, setItems] = useState<ShoppingListItem[] | null>(null)
+  const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([])
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set())
   const [generating, setGenerating] = useState(false)
   const [generateMessage, setGenerateMessage] = useState<string | null>(null)
@@ -37,6 +57,7 @@ export function ShoppingListDetailView({
 
   useEffect(() => {
     refresh()
+    fetchGroceryItems().then(setGroceryItems)
   }, [])
 
   const visibleItems = items?.filter((item) => item.shopping_list === list.id) ?? null
@@ -82,6 +103,11 @@ export function ShoppingListDetailView({
     await refresh()
   }
 
+  async function handleChangeGroceryItem(itemId: string, groceryItemId: string) {
+    await updateShoppingListItem(itemId, { grocery_item: groceryItemId || null })
+    await refresh()
+  }
+
   async function handleDelete(id: string) {
     await deleteShoppingListItem(id)
     await refresh()
@@ -99,6 +125,7 @@ export function ShoppingListDetailView({
         meal_plan: null,
         name,
         quantity: '',
+        grocery_item: null,
         is_checked: false,
       })
       setNewItemName('')
@@ -184,37 +211,52 @@ export function ShoppingListDetailView({
       )}
 
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        {visibleItems?.map((item) => (
-          <li key={item.id} className="flex items-center justify-between gap-3 px-4 py-3">
-            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                checked={item.is_checked}
-                onChange={() => handleToggleChecked(item)}
-                className="h-4 w-4 shrink-0 rounded border-slate-300"
-              />
-              <span
-                className={`min-w-0 truncate text-sm ${
-                  item.is_checked ? 'text-slate-400 line-through' : 'text-slate-800'
-                }`}
-              >
-                {item.name}
-                {item.quantity && <span className="text-slate-500"> · {item.quantity}</span>}
-              </span>
-            </label>
-            <div className="flex shrink-0 items-center gap-3">
-              {item.added_by_email && (
+        {visibleItems?.map((item) => {
+          const matches = matchingGroceryItems(item.name, groceryItems)
+          // Nothing explicitly chosen yet — default to the cheapest match,
+          // recomputed live each render so it keeps tracking whichever
+          // match is currently cheapest until the user picks one themself.
+          const effectiveGroceryItemId = item.grocery_item ?? (matches[0]?.id ?? '')
+
+          return (
+            <li key={item.id} className="flex items-center justify-between gap-3 px-4 py-3">
+              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={item.is_checked}
+                  onChange={() => handleToggleChecked(item)}
+                  className="h-4 w-4 shrink-0 rounded border-slate-300"
+                />
                 <span
-                  className="max-w-[8rem] truncate text-xs text-slate-400"
-                  title={item.added_by_email}
+                  className={`min-w-0 truncate text-sm ${
+                    item.is_checked ? 'text-slate-400 line-through' : 'text-slate-800'
+                  }`}
                 >
-                  {item.added_by_email}
+                  {item.name}
+                  {item.quantity && <span className="text-slate-500"> · {item.quantity}</span>}
                 </span>
-              )}
-              <ConfirmDeleteButton label="Remove item" onConfirm={() => handleDelete(item.id)} />
-            </div>
-          </li>
-        ))}
+              </label>
+              <div className="flex shrink-0 items-center gap-3">
+                {matches.length > 0 && (
+                  <select
+                    value={effectiveGroceryItemId}
+                    onChange={(e) => handleChangeGroceryItem(item.id, e.target.value)}
+                    aria-label={`Choose which product to buy for ${item.name}`}
+                    className="max-w-[16rem] rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 focus:border-slate-500 focus:outline-none"
+                  >
+                    {matches.map((gi) => (
+                      <option key={gi.id} value={gi.id}>
+                        {gi.store_detail.name} — {gi.name}
+                        {gi.price ? ` — £${gi.price}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <ConfirmDeleteButton label="Remove item" onConfirm={() => handleDelete(item.id)} />
+              </div>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

@@ -240,6 +240,7 @@ class ShoppingListItemSerializer(serializers.ModelSerializer):
     # the response (not serialized as null) for an item added_by=None — see
     # the equivalent note on catalog.GroceryItemSerializer.created_by_email.
     added_by_email = serializers.SerializerMethodField()
+    grocery_item_detail = GroceryItemSummarySerializer(source="grocery_item", read_only=True)
 
     class Meta:
         model = ShoppingListItem
@@ -249,6 +250,8 @@ class ShoppingListItemSerializer(serializers.ModelSerializer):
             "meal_plan",
             "name",
             "quantity",
+            "grocery_item",
+            "grocery_item_detail",
             "is_checked",
             "added_by",
             "added_by_email",

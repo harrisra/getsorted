@@ -38,7 +38,7 @@ export function ShoppingListsPage() {
 
   if (selectedList) {
     return (
-      <div className="mx-auto max-w-2xl p-4 sm:p-8">
+      <div className="mx-auto max-w-[58.8rem] p-4 sm:p-8">
         <ShoppingListDetailView list={selectedList} onBack={() => setSelectedListId(null)} />
       </div>
     )
@@ -73,7 +73,7 @@ export function ShoppingListsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-8">
+    <div className="mx-auto max-w-[58.8rem] space-y-6 p-4 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold text-slate-800">Shopping lists</h1>
         {!showAddForm && (

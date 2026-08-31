@@ -250,7 +250,7 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
 
 
 class ShoppingListItemViewSet(HouseholdScopedViewSet):
-    queryset = ShoppingListItem.objects.all()
+    queryset = ShoppingListItem.objects.select_related("grocery_item", "grocery_item__store")
     serializer_class = ShoppingListItemSerializer
     household_lookup = "shopping_list__household__members"
 
