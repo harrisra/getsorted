@@ -136,7 +136,10 @@ SITE_ID = 1
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "dj_rest_auth.jwt_auth.JWTCookieAuthentication",
+        # Our own lenient wrapper — see accounts/authentication.py for why a
+        # stale/unusable JWT cookie must not be allowed to 401 an AllowAny
+        # endpoint (login, registration, password reset) before it runs.
+        "accounts.authentication.JWTCookieAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
