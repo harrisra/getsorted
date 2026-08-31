@@ -528,10 +528,19 @@ export interface ShoppingListItem {
   shopping_list: string
   meal_plan: string | null
   name: string
-  quantity: string
+  // The total amount needed, across everything this item was added for —
+  // a manually added item with none of these set is just "make sure this
+  // is on the list", no amount implied.
+  grams: number | null
+  pieces: number | null
+  milliliters: number | null
   /** The specific catalog product (and so store) chosen for this item. */
   grocery_item: string | null
   grocery_item_detail: GroceryItemRef | null
+  /** How many of grocery_item's packs to buy to cover the amount needed
+   * (ceiling division), or null if there's no match or no shared unit to
+   * compare against. Server-computed. */
+  packs_needed: number | null
   is_checked: boolean
   added_by: string | null
   added_by_email: string | null
@@ -540,7 +549,7 @@ export interface ShoppingListItem {
 
 export type ShoppingListItemInput = Omit<
   ShoppingListItem,
-  'id' | 'grocery_item_detail' | 'added_by' | 'added_by_email' | 'created_at'
+  'id' | 'grocery_item_detail' | 'packs_needed' | 'added_by' | 'added_by_email' | 'created_at'
 >
 
 export async function fetchShoppingListItems(): Promise<ShoppingListItem[]> {

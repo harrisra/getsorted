@@ -235,7 +235,13 @@ class ShoppingListItem(models.Model):
         MealPlan, on_delete=models.SET_NULL, null=True, blank=True, related_name="shopping_items"
     )
     name = models.CharField(max_length=255)
-    quantity = models.CharField(max_length=100, blank=True)
+    # The total amount needed of this item, across everything it was added
+    # for — at least one is set once there's any quantity data (a manually
+    # added item with none of these is just "make sure this is on the
+    # list", no amount implied).
+    grams = models.PositiveIntegerField(null=True, blank=True)
+    pieces = models.PositiveIntegerField(null=True, blank=True)
+    milliliters = models.PositiveIntegerField(null=True, blank=True)
     # Which specific catalog product (and so which store) to buy this item
     # as — picked from whichever GroceryItems name-match `name`, defaulting
     # to the cheapest. Optional: not every item corresponds to something in
@@ -258,3 +264,19 @@ class ShoppingListItem(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def packs_needed(self):
+        """How many of the matched grocery item to buy to cover the amount
+        needed, rounded up (e.g. needing 500g from a 200g pack means 3).
+        None if there's no matched item, no needed-amount data, or no unit
+        (grams/milliliters/pieces) shared between the two to compare."""
+        item = self.grocery_item
+        if not item:
+            return None
+        for dimension in ("grams", "milliliters", "pieces"):
+            item_amount = getattr(item, dimension)
+            needed_amount = getattr(self, dimension)
+            if item_amount and needed_amount:
+                return -(-needed_amount // item_amount)  # ceiling division
+        return None

@@ -50,5 +50,5 @@ class ShoppingListAdmin(admin.ModelAdmin):
 
 @admin.register(ShoppingListItem)
 class ShoppingListItemAdmin(admin.ModelAdmin):
-    list_display = ["name", "shopping_list", "quantity", "is_checked"]
+    list_display = ["name", "shopping_list", "grams", "pieces", "milliliters", "is_checked"]
     list_filter = ["shopping_list__household", "is_checked"]

@@ -241,6 +241,7 @@ class ShoppingListItemSerializer(serializers.ModelSerializer):
     # the equivalent note on catalog.GroceryItemSerializer.created_by_email.
     added_by_email = serializers.SerializerMethodField()
     grocery_item_detail = GroceryItemSummarySerializer(source="grocery_item", read_only=True)
+    packs_needed = serializers.SerializerMethodField()
 
     class Meta:
         model = ShoppingListItem
@@ -249,15 +250,21 @@ class ShoppingListItemSerializer(serializers.ModelSerializer):
             "shopping_list",
             "meal_plan",
             "name",
-            "quantity",
+            "grams",
+            "pieces",
+            "milliliters",
             "grocery_item",
             "grocery_item_detail",
+            "packs_needed",
             "is_checked",
             "added_by",
             "added_by_email",
             "created_at",
         ]
         read_only_fields = ["added_by", "created_at"]
+
+    def get_packs_needed(self, obj):
+        return obj.packs_needed
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

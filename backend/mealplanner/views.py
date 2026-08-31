@@ -168,6 +168,45 @@ class MealSlotViewSet(HouseholdScopedViewSet):
     household_lookup = "meal_plan__household__members"
 
 
+def add_or_merge_shopping_list_item(
+    shopping_list, name, grams, pieces, milliliters, meal_plan_id, user, grocery_item=None
+):
+    """Add (name, amount) to a shopping list, merging into an existing item
+    of the same name (case/whitespace-insensitive) rather than creating a
+    duplicate row — the same ingredient/item wanted more than once (a
+    second generate run, a second manual add) accumulates onto one line
+    instead of piling up separate ones. Returns (item, created).
+    """
+    name = name.strip()
+    existing = ShoppingListItem.objects.filter(shopping_list=shopping_list, name__iexact=name).first()
+    if existing:
+        existing.grams = (existing.grams or 0) + (grams or 0) or None
+        existing.pieces = (existing.pieces or 0) + (pieces or 0) or None
+        existing.milliliters = (existing.milliliters or 0) + (milliliters or 0) or None
+        # Only keep a meal_plan link when it's still unambiguous — if this
+        # merge came from a different plan than the item already had, we
+        # can no longer point at just one.
+        if existing.meal_plan_id != meal_plan_id:
+            existing.meal_plan_id = None
+        # The matched product isn't touched by a merge — combining
+        # quantities shouldn't silently swap out a match someone already
+        # chose (or set one on an item that deliberately had none).
+        existing.save(update_fields=["grams", "pieces", "milliliters", "meal_plan"])
+        return existing, False
+
+    item = ShoppingListItem.objects.create(
+        shopping_list=shopping_list,
+        meal_plan_id=meal_plan_id,
+        name=name,
+        grams=grams,
+        pieces=pieces,
+        milliliters=milliliters,
+        grocery_item=grocery_item,
+        added_by=user,
+    )
+    return item, True
+
+
 class ShoppingListViewSet(HouseholdScopedViewSet):
     """A household can have several shopping lists going at once (e.g.
     "This week", "Costco run")."""
@@ -182,15 +221,11 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
     def generate(self, request, pk=None):
         """Add items to this list built from the recipes planned on the
         given dates. One line per distinct ingredient name across every
-        selected day's planned recipes — amounts for the same ingredient
-        name are summed together (e.g. two recipes both needing "Cheddar"
-        combine into one line) rather than added as separate duplicate
-        lines.
-
-        This only adds new items; it doesn't try to match against — or
-        dedupe with — whatever is already on the list, so regenerating over
-        already-covered dates will add another round of lines rather than
-        updating the earlier ones.
+        selected day's planned recipes, amounts summed together — and that
+        merge extends to whatever's already on the list too (see
+        add_or_merge_shopping_list_item): two recipes both needing
+        "Cheddar" combine into one line, and so does regenerating over
+        already-covered dates, rather than piling up duplicate lines.
         """
         shopping_list = self.get_object()
         dates = request.data.get("dates")
@@ -214,38 +249,24 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
                     key = ingredient.name.strip().lower()
                     groups.setdefault(key, []).append((ingredient, slot.meal_plan_id))
 
-        created = []
+        affected = []
         for entries in groups.values():
             display_name = entries[0][0].name.strip()
             grams = sum(ing.grams or 0 for ing, _ in entries) or None
             pieces = sum(ing.pieces or 0 for ing, _ in entries) or None
             milliliters = sum(ing.milliliters or 0 for ing, _ in entries) or None
-            quantity = " + ".join(
-                part
-                for part in [
-                    f"{grams}g" if grams else "",
-                    f"{pieces}pc" if pieces else "",
-                    f"{milliliters}ml" if milliliters else "",
-                ]
-                if part
-            )
             # Only link a single originating meal_plan when every occurrence
             # of this ingredient came from the same one — otherwise leave it
             # unlinked rather than pointing at an arbitrary one of several.
             meal_plan_ids = {mp_id for _, mp_id in entries}
             meal_plan_id = meal_plan_ids.pop() if len(meal_plan_ids) == 1 else None
 
-            created.append(
-                ShoppingListItem.objects.create(
-                    shopping_list=shopping_list,
-                    meal_plan_id=meal_plan_id,
-                    name=display_name,
-                    quantity=quantity,
-                    added_by=request.user,
-                )
+            item, _created = add_or_merge_shopping_list_item(
+                shopping_list, display_name, grams, pieces, milliliters, meal_plan_id, request.user
             )
+            affected.append(item)
 
-        serializer = ShoppingListItemSerializer(created, many=True, context={"request": request})
+        serializer = ShoppingListItemSerializer(affected, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -254,5 +275,29 @@ class ShoppingListItemViewSet(HouseholdScopedViewSet):
     serializer_class = ShoppingListItemSerializer
     household_lookup = "shopping_list__household__members"
 
-    def perform_create(self, serializer):
-        serializer.save(added_by=self.request.user)
+    def create(self, request, *args, **kwargs):
+        # Merges into an existing same-named item rather than always
+        # inserting a new row — see add_or_merge_shopping_list_item. Bypasses
+        # ModelViewSet's default create()/perform_create() since that always
+        # inserts; whether this ends up being a create or a merge-update
+        # isn't known until the name is checked against what's already here.
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        meal_plan = data.get("meal_plan")
+
+        item, created = add_or_merge_shopping_list_item(
+            shopping_list=data["shopping_list"],
+            name=data["name"],
+            grams=data.get("grams"),
+            pieces=data.get("pieces"),
+            milliliters=data.get("milliliters"),
+            meal_plan_id=meal_plan.id if meal_plan else None,
+            user=request.user,
+            grocery_item=data.get("grocery_item"),
+        )
+        out_serializer = self.get_serializer(item)
+        return Response(
+            out_serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )

@@ -32,6 +32,33 @@ function matchingGroceryItems(itemName: string, groceryItems: GroceryItem[]): Gr
     })
 }
 
+// The raw amount needed, e.g. "500g" or "2pc + 300ml" — used as a fallback
+// when there's no matched grocery item to express the amount as a pack
+// count instead.
+function formatAmount(item: ShoppingListItem): string | null {
+  const parts = [
+    item.grams ? `${item.grams}g` : null,
+    item.pieces ? `${item.pieces}pc` : null,
+    item.milliliters ? `${item.milliliters}ml` : null,
+  ].filter((part): part is string => part != null)
+  return parts.length > 0 ? parts.join(' + ') : null
+}
+
+// Parse a quantity input's text into a positive int, or null if blank/invalid.
+function parseAmount(value: string): number | null {
+  const n = Number(value)
+  return value.trim() !== '' && Number.isFinite(n) && n > 0 ? Math.trunc(n) : null
+}
+
+// Cost of buying enough packs of the matched product to cover this row —
+// packs_needed times the pack price. Null unless both are known (i.e. a
+// grocery item is actually matched and priced).
+function formatRowCost(item: ShoppingListItem): string | null {
+  const price = item.grocery_item_detail?.price
+  if (item.packs_needed == null || price == null) return null
+  return `£${(Number(price) * item.packs_needed).toFixed(2)}`
+}
+
 // A dedicated screen for one shopping list — its "generate from planned
 // meals" controls and its items — rather than a single page trying to
 // juggle every list a household has going at once.
@@ -48,6 +75,9 @@ export function ShoppingListDetailView({
   const [generating, setGenerating] = useState(false)
   const [generateMessage, setGenerateMessage] = useState<string | null>(null)
   const [newItemName, setNewItemName] = useState('')
+  const [newItemGrams, setNewItemGrams] = useState('')
+  const [newItemPieces, setNewItemPieces] = useState('')
+  const [newItemMilliliters, setNewItemMilliliters] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
   const [addingItem, setAddingItem] = useState(false)
 
@@ -79,12 +109,12 @@ export function ShoppingListDetailView({
     setGenerateMessage(null)
     setGenerating(true)
     try {
-      const created = await generateShoppingList(list.id, Array.from(selectedDates))
+      const affected = await generateShoppingList(list.id, Array.from(selectedDates))
       await refresh()
       setSelectedDates(new Set())
       setGenerateMessage(
-        created.length > 0
-          ? `Added ${created.length} item(s) to the list.`
+        affected.length > 0
+          ? `Updated ${affected.length} item(s) on the list.`
           : 'Nothing planned for those days — no items added.',
       )
     } catch (err) {
@@ -124,11 +154,16 @@ export function ShoppingListDetailView({
         shopping_list: list.id,
         meal_plan: null,
         name,
-        quantity: '',
+        grams: parseAmount(newItemGrams),
+        pieces: parseAmount(newItemPieces),
+        milliliters: parseAmount(newItemMilliliters),
         grocery_item: null,
         is_checked: false,
       })
       setNewItemName('')
+      setNewItemGrams('')
+      setNewItemPieces('')
+      setNewItemMilliliters('')
       await refresh()
     } catch (err) {
       setAddError(
@@ -186,13 +221,37 @@ export function ShoppingListDetailView({
       </div>
 
       <div className="space-y-2">
-        <form onSubmit={handleAddItem} className="flex gap-2">
+        <form onSubmit={handleAddItem} className="flex flex-wrap gap-2">
           <input
             type="text"
             placeholder="Add an item…"
             value={newItemName}
             onChange={(e) => setNewItemName(e.target.value)}
-            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            className="min-w-[10rem] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="g"
+            value={newItemGrams}
+            onChange={(e) => setNewItemGrams(e.target.value)}
+            className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="pc"
+            value={newItemPieces}
+            onChange={(e) => setNewItemPieces(e.target.value)}
+            className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="ml"
+            value={newItemMilliliters}
+            onChange={(e) => setNewItemMilliliters(e.target.value)}
+            className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
           />
           <button
             type="submit"
@@ -233,10 +292,13 @@ export function ShoppingListDetailView({
                   }`}
                 >
                   {item.name}
-                  {item.quantity && <span className="text-slate-500"> · {item.quantity}</span>}
                 </span>
               </label>
               <div className="flex shrink-0 items-center gap-3">
+                {/* Raw amount needed, to the left of the product dropdown. */}
+                {formatAmount(item) != null && (
+                  <span className="w-20 shrink-0 text-xs text-slate-500">{formatAmount(item)}</span>
+                )}
                 {matches.length > 0 && (
                   <select
                     value={effectiveGroceryItemId}
@@ -251,6 +313,17 @@ export function ShoppingListDetailView({
                       </option>
                     ))}
                   </select>
+                )}
+                {/* Packs needed of the matched product, to the right of the
+                    dropdown. */}
+                {item.packs_needed != null && (
+                  <span className="w-10 shrink-0 text-xs text-slate-500">× {item.packs_needed}</span>
+                )}
+                {/* Total cost for this row: packs needed × pack price. */}
+                {formatRowCost(item) != null && (
+                  <span className="w-16 shrink-0 text-right text-sm font-medium text-slate-700">
+                    {formatRowCost(item)}
+                  </span>
                 )}
                 <ConfirmDeleteButton label="Remove item" onConfirm={() => handleDelete(item.id)} />
               </div>
