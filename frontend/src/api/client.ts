@@ -154,6 +154,17 @@ export async function fetchCurrentUser(): Promise<CurrentUser | null> {
   return response.json()
 }
 
+export async function updateCurrentUser(
+  firstName: string,
+  lastName: string,
+): Promise<CurrentUser> {
+  const response = await apiFetch('/api/auth/user/', {
+    method: 'PATCH',
+    body: JSON.stringify({ first_name: firstName, last_name: lastName }),
+  })
+  return response.json()
+}
+
 export interface Household {
   id: string
   name: string

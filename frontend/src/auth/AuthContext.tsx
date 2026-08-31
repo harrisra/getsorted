@@ -7,6 +7,7 @@ import {
   logout as apiLogout,
   onSilentTokenRefresh,
   signup as apiSignup,
+  updateCurrentUser,
 } from '../api/client'
 
 interface AuthContextValue {
@@ -15,6 +16,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   signup: (email: string, password1: string, password2: string) => Promise<void>
   logout: () => Promise<void>
+  updateProfile: (firstName: string, lastName: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -67,8 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
+  const updateProfile = useCallback(async (firstName: string, lastName: string) => {
+    setUser(await updateCurrentUser(firstName, lastName))
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )
