@@ -445,7 +445,16 @@ export function ShoppingListDetailView({
             .item.checked .name { text-decoration: line-through; color: #94a3b8; }
             @media print {
               body { padding: 0; }
-              .columns { column-count: 2; }
+              /* column-fill: auto fills column one all the way down the
+                 page before spilling into column two, instead of the
+                 default "balance" behavior that splits a short list into
+                 two half-height columns with blank space below both. No
+                 explicit height here — the actual printed page height
+                 (via the browser's page box) is what bounds each column;
+                 forcing a fixed height (e.g. 100vh) instead reserves that
+                 much space regardless of content, which pushed a trailing
+                 blank page even for a short list. */
+              .columns { column-count: 2; column-fill: auto; }
             }
           </style>
         </head>
