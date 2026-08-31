@@ -11,9 +11,11 @@ import {
   fetchGroceryItems,
   fetchShoppingListItems,
   generateShoppingList,
+  renameShoppingList,
   updateShoppingListItem,
 } from '../api/client'
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
+import { PencilIcon } from '../icons'
 import { addDays, formatDateISO, formatDayHeading } from '../mealplanner/dates'
 
 // Catalog items whose name mentions this shopping-list item's name (e.g.
@@ -167,9 +169,15 @@ function sortEnriched(enriched: EnrichedItem[], mode: SortMode): EnrichedItem[] 
 export function ShoppingListDetailView({
   list,
   onBack,
+  onRenamed,
 }: {
   list: ShoppingList
   onBack: () => void
+  // Called with the updated list after a successful rename, so the parent
+  // (which owns the list of ShoppingLists) can keep its copy — and so the
+  // browse page's row — in sync too, rather than this view's header being
+  // the only place that knows about the new name.
+  onRenamed: (list: ShoppingList) => void
 }) {
   const [items, setItems] = useState<ShoppingListItem[] | null>(null)
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([])
@@ -183,6 +191,10 @@ export function ShoppingListDetailView({
   const [addError, setAddError] = useState<string | null>(null)
   const [addingItem, setAddingItem] = useState(false)
   const [sortMode, setSortMode] = useState<SortMode>('alpha')
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState(list.name)
+  const [renaming, setRenaming] = useState(false)
+  const [renameError, setRenameError] = useState<string | null>(null)
 
   async function refresh() {
     setItems(await fetchShoppingListItems())
@@ -210,6 +222,36 @@ export function ShoppingListDetailView({
       else next.add(day)
       return next
     })
+  }
+
+  function startEditingName() {
+    setNameInput(list.name)
+    setRenameError(null)
+    setEditingName(true)
+  }
+
+  async function handleRename(event: FormEvent) {
+    event.preventDefault()
+    const name = nameInput.trim()
+    if (!name || name === list.name) {
+      setEditingName(false)
+      return
+    }
+    setRenameError(null)
+    setRenaming(true)
+    try {
+      const updated = await renameShoppingList(list.id, name)
+      onRenamed(updated)
+      setEditingName(false)
+    } catch (err) {
+      setRenameError(
+        err instanceof ApiError
+          ? Object.values(err.fieldErrors).flat().join(' ')
+          : 'Could not rename the list. Please try again.',
+      )
+    } finally {
+      setRenaming(false)
+    }
   }
 
   async function handleGenerate() {
@@ -293,112 +335,161 @@ export function ShoppingListDetailView({
       >
         ← Back to shopping lists
       </button>
-      <h1 className="text-xl font-semibold text-slate-800">{list.name}</h1>
-
-      <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-        <span className="text-sm font-medium text-slate-700">Generate from planned meals</span>
-        <div className="flex flex-wrap gap-2">
-          {next7Days.map((day) => (
-            <label
-              key={day}
-              className={`cursor-pointer rounded-md border px-2.5 py-1.5 text-sm font-medium transition ${
-                selectedDates.has(day)
-                  ? 'border-slate-800 bg-slate-800 text-white'
-                  : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={selectedDates.has(day)}
-                onChange={() => toggleDate(day)}
-                className="sr-only"
-              />
-              {formatDayHeading(day)}
-            </label>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={selectedDates.size === 0 || generating}
-          className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-        >
-          {generating ? 'Generating…' : `Generate shopping list (${selectedDates.size})`}
-        </button>
-        {generateMessage && <p className="text-sm text-slate-600">{generateMessage}</p>}
-      </div>
-
-      <div className="space-y-2">
-        <form onSubmit={handleAddItem} className="flex flex-wrap gap-2">
+      {editingName ? (
+        <form onSubmit={handleRename} className="flex items-center gap-2">
           <input
             type="text"
-            placeholder="Add an item…"
-            value={newItemName}
-            onChange={(e) => setNewItemName(e.target.value)}
-            className="min-w-[10rem] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-          />
-          <input
-            type="number"
-            min={0}
-            placeholder="g"
-            value={newItemGrams}
-            onChange={(e) => setNewItemGrams(e.target.value)}
-            className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
-          />
-          <input
-            type="number"
-            min={0}
-            placeholder="pc"
-            value={newItemPieces}
-            onChange={(e) => setNewItemPieces(e.target.value)}
-            className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
-          />
-          <input
-            type="number"
-            min={0}
-            placeholder="ml"
-            value={newItemMilliliters}
-            onChange={(e) => setNewItemMilliliters(e.target.value)}
-            className="w-20 rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            autoFocus
+            required
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-xl font-semibold text-slate-800 focus:border-slate-500 focus:outline-none"
           />
           <button
             type="submit"
-            disabled={addingItem || !newItemName.trim()}
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            disabled={renaming}
+            className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
           >
-            Add
+            {renaming ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditingName(false)}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+          >
+            Cancel
           </button>
         </form>
-        {addError && <p className="text-sm text-red-600">{addError}</p>}
-      </div>
-
-      {visibleItems === null && <p className="text-sm text-slate-400">Loading…</p>}
-      {visibleItems !== null && visibleItems.length === 0 && (
-        <p className="text-sm text-slate-500">Nothing on this list yet.</p>
-      )}
-
-      {visibleItems !== null && visibleItems.length > 0 && (
+      ) : (
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-700">Sort by:</span>
-          {(Object.keys(SORT_MODE_LABELS) as SortMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setSortMode(mode)}
-              className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
-                sortMode === mode
-                  ? 'border-slate-800 bg-slate-800 text-white'
-                  : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              {SORT_MODE_LABELS[mode]}
-            </button>
-          ))}
+          <h1 className="text-xl font-semibold text-slate-800">{list.name}</h1>
+          <button
+            type="button"
+            onClick={startEditingName}
+            title="Rename list"
+            aria-label="Rename list"
+            className="text-slate-500 hover:text-slate-900"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
         </div>
       )}
+      {renameError && <p className="text-sm text-red-600">{renameError}</p>}
 
-      <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        {(() => {
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[20rem_1fr] lg:items-start">
+        {/* Left panel: building the list, rather than looking at it. */}
+        <div className="space-y-6">
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+            <span className="text-sm font-medium text-slate-700">Generate from planned meals</span>
+            <div className="flex flex-wrap gap-2">
+              {next7Days.map((day) => (
+                <label
+                  key={day}
+                  className={`cursor-pointer rounded-md border px-2.5 py-1.5 text-sm font-medium transition ${
+                    selectedDates.has(day)
+                      ? 'border-slate-800 bg-slate-800 text-white'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedDates.has(day)}
+                    onChange={() => toggleDate(day)}
+                    className="sr-only"
+                  />
+                  {formatDayHeading(day)}
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={selectedDates.size === 0 || generating}
+              className="w-full rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+            >
+              {generating ? 'Generating…' : `Generate shopping list (${selectedDates.size})`}
+            </button>
+            {generateMessage && <p className="text-sm text-slate-600">{generateMessage}</p>}
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+            <span className="text-sm font-medium text-slate-700">Add an item</span>
+            <form onSubmit={handleAddItem} className="space-y-2">
+              <input
+                type="text"
+                placeholder="Item name…"
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="g"
+                  value={newItemGrams}
+                  onChange={(e) => setNewItemGrams(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="pc"
+                  value={newItemPieces}
+                  onChange={(e) => setNewItemPieces(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="ml"
+                  value={newItemMilliliters}
+                  onChange={(e) => setNewItemMilliliters(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={addingItem || !newItemName.trim()}
+                className="w-full rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </form>
+            {addError && <p className="text-sm text-red-600">{addError}</p>}
+          </div>
+        </div>
+
+        {/* Right panel: the list itself, centered in whatever width is left
+            next to the left panel rather than hugging its left edge. */}
+        <div className="mx-auto w-full max-w-2xl space-y-4">
+          {visibleItems === null && <p className="text-sm text-slate-400">Loading…</p>}
+          {visibleItems !== null && visibleItems.length === 0 && (
+            <p className="text-sm text-slate-500">Nothing on this list yet.</p>
+          )}
+
+          {visibleItems !== null && visibleItems.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-slate-700">Sort by:</span>
+              {(Object.keys(SORT_MODE_LABELS) as SortMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setSortMode(mode)}
+                  className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
+                    sortMode === mode
+                      ? 'border-slate-800 bg-slate-800 text-white'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {SORT_MODE_LABELS[mode]}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
+            {(() => {
           let lastHeading: string | null | undefined
           return sortedItems?.map(({ item, matches, effectiveGroceryItemId, effectiveStore, effectiveAisleLabel }) => {
             // In "grouped by store"/"store + aisle" mode, drop in a heading
@@ -473,14 +564,16 @@ export function ShoppingListDetailView({
               </Fragment>
             )
           })
-        })()}
-      </ul>
+            })()}
+          </ul>
 
-      {visibleItems !== null && visibleItems.length > 0 && (
-        <p className="text-right text-sm font-semibold text-slate-800">
-          Total: £{totalCost.toFixed(2)}
-        </p>
-      )}
+          {visibleItems !== null && visibleItems.length > 0 && (
+            <p className="text-right text-sm font-semibold text-slate-800">
+              Total: £{totalCost.toFixed(2)}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

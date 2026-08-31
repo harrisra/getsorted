@@ -37,9 +37,19 @@ export function ShoppingListsPage() {
     : null
 
   if (selectedList) {
+    // Full-width here (not the centered max-w-[58.8rem] the browse page
+    // uses) — ShoppingListDetailView pins its own left panel to the left
+    // edge and centers the list in whatever's left, which needs the whole
+    // viewport width to work with rather than a pre-capped column.
     return (
-      <div className="mx-auto max-w-[58.8rem] p-4 sm:p-8">
-        <ShoppingListDetailView list={selectedList} onBack={() => setSelectedListId(null)} />
+      <div className="w-full p-4 sm:p-8">
+        <ShoppingListDetailView
+          list={selectedList}
+          onBack={() => setSelectedListId(null)}
+          onRenamed={(updated) =>
+            setLists((prev) => prev?.map((l) => (l.id === updated.id ? updated : l)) ?? prev)
+          }
+        />
       </div>
     )
   }
