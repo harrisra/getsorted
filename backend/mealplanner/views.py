@@ -6,13 +6,13 @@ from django.http import Http404, HttpResponse
 from PIL import Image, UnidentifiedImageError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from accounts.models import Household
+from accounts.models import Household, Membership
 from .models import MAX_RECIPE_IMAGE_MB, MealPlan, MealSlot, MealType, Recipe, ShoppingListItem
 from .permissions import IsHouseholdMember
 from .serializers import (
@@ -44,6 +44,17 @@ class RecipeViewSet(HouseholdScopedViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        is_creator = instance.created_by_id == self.request.user.id
+        is_household_owner = Membership.objects.filter(
+            household=instance.household, user=self.request.user, role=Membership.Role.OWNER
+        ).exists()
+        if not (is_creator or is_household_owner):
+            raise PermissionDenied(
+                "Only the recipe's creator or a household owner can delete it."
+            )
+        instance.delete()
 
     @action(
         detail=True,

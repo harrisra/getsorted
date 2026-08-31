@@ -10,6 +10,7 @@ import {
   updateRecipe,
   uploadRecipeImage,
 } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { useHouseholds } from '../households/HouseholdsContext'
 import { PencilIcon } from '../icons'
@@ -29,6 +30,7 @@ function pricedIngredientCount(recipe: Recipe): number {
 }
 
 export function RecipesPage() {
+  const { user } = useAuth()
   const { currentHousehold } = useHouseholds()
   const [recipes, setRecipes] = useState<Recipe[] | null>(null)
   const [mealTypeFilter, setMealTypeFilter] = useState<Recipe['meal_type'] | ''>('')
@@ -56,6 +58,11 @@ export function RecipesPage() {
 
   if (!currentHousehold) return null
   const householdId = currentHousehold.id
+  // Only the recipe's creator or a household owner can delete it — every
+  // recipe shown here belongs to currentHousehold, so its role applies to
+  // all of them.
+  const canDelete = (recipe: Recipe) =>
+    recipe.created_by === user?.pk || currentHousehold.role === 'owner'
 
   const visibleRecipes = recipes?.filter((r) => r.household === householdId) ?? null
   const editingRecipe = editingId ? (visibleRecipes?.find((r) => r.id === editingId) ?? null) : null
@@ -367,10 +374,12 @@ export function RecipesPage() {
                 >
                   <PencilIcon className="h-4 w-4" />
                 </button>
-                <ConfirmDeleteButton
-                  label="Remove recipe"
-                  onConfirm={() => handleDelete(recipe.id)}
-                />
+                {canDelete(recipe) && (
+                  <ConfirmDeleteButton
+                    label="Remove recipe"
+                    onConfirm={() => handleDelete(recipe.id)}
+                  />
+                )}
               </div>
             </div>
           </li>
