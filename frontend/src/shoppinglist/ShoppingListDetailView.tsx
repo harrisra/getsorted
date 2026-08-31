@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
+  AISLE_OPTIONS,
   ApiError,
   type GroceryItem,
   type ShoppingList,
@@ -79,24 +80,27 @@ function formatRowCost(item: ShoppingListItem): string | null {
   return cost != null ? `£${cost.toFixed(2)}` : null
 }
 
-type SortMode = 'alpha' | 'price' | 'store'
+type SortMode = 'alpha' | 'price' | 'store' | 'store_aisle'
 
 const SORT_MODE_LABELS: Record<SortMode, string> = {
   alpha: 'A–Z',
   price: 'Price',
   store: 'Store',
+  store_aisle: 'Store + Aisle',
 }
 
 interface EnrichedItem {
   item: ShoppingListItem
   matches: GroceryItem[]
   effectiveGroceryItemId: string
-  // The store of whichever product this item would actually be bought as —
-  // its saved match, or (nothing chosen yet) the same default-to-cheapest
-  // match shown in the dropdown. Used for the "grouped by store" sort so
-  // items group under the store they'll really be bought from, not just
-  // the ones with an explicitly saved match.
+  // The store (and aisle) of whichever product this item would actually be
+  // bought as — its saved match, or (nothing chosen yet) the same
+  // default-to-cheapest match shown in the dropdown. Used for the "grouped
+  // by store"/"store + aisle" sorts so items group under the store/aisle
+  // they'll really be bought from, not just the ones with an explicitly
+  // saved match.
   effectiveStore: string | null
+  effectiveAisleLabel: string | null
 }
 
 function enrichItems(items: ShoppingListItem[], groceryItems: GroceryItem[]): EnrichedItem[] {
@@ -108,8 +112,19 @@ function enrichItems(items: ShoppingListItem[], groceryItems: GroceryItem[]): En
       matches,
       effectiveGroceryItemId: item.grocery_item ?? (matches[0]?.id ?? ''),
       effectiveStore: effective?.store_detail.name ?? null,
+      effectiveAisleLabel: AISLE_OPTIONS.find((a) => a.value === effective?.aisle)?.label ?? null,
     }
   })
+}
+
+// The heading text for a group in "store"/"store + aisle" mode, or null in
+// modes that don't group items under headings at all.
+function groupHeading(mode: SortMode, effectiveStore: string | null, effectiveAisleLabel: string | null): string | null {
+  if (mode === 'store') return effectiveStore ?? 'Unmatched'
+  if (mode === 'store_aisle') {
+    return effectiveStore ? `${effectiveStore} — ${effectiveAisleLabel ?? 'No aisle'}` : 'Unmatched'
+  }
+  return null
 }
 
 // Unchecked items always sort before checked ones, regardless of mode —
@@ -123,15 +138,25 @@ function sortEnriched(enriched: EnrichedItem[], mode: SortMode): EnrichedItem[] 
       // Costliest first — items with no known cost sort to the end.
       return (rowCost(b.item) ?? -1) - (rowCost(a.item) ?? -1)
     }
-    // Items with no matched product at all (nothing to group by) sort last.
+    // "store" and "store_aisle": items with no matched product at all
+    // (nothing to group by) sort last.
     if (a.effectiveStore == null && b.effectiveStore == null) {
       return a.item.name.localeCompare(b.item.name)
     }
     if (a.effectiveStore == null) return 1
     if (b.effectiveStore == null) return -1
-    return a.effectiveStore !== b.effectiveStore
-      ? a.effectiveStore.localeCompare(b.effectiveStore)
-      : a.item.name.localeCompare(b.item.name)
+    if (a.effectiveStore !== b.effectiveStore) return a.effectiveStore.localeCompare(b.effectiveStore)
+    if (mode === 'store_aisle') {
+      // Within the same store, items with no aisle set sort after ones
+      // that have one.
+      const aisleA = a.effectiveAisleLabel
+      const aisleB = b.effectiveAisleLabel
+      if (aisleA == null && aisleB == null) return a.item.name.localeCompare(b.item.name)
+      if (aisleA == null) return 1
+      if (aisleB == null) return -1
+      if (aisleA !== aisleB) return aisleA.localeCompare(aisleB)
+    }
+    return a.item.name.localeCompare(b.item.name)
   })
   return sorted
 }
@@ -374,19 +399,21 @@ export function ShoppingListDetailView({
 
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
         {(() => {
-          let lastStoreHeading: string | undefined
-          return sortedItems?.map(({ item, matches, effectiveGroceryItemId, effectiveStore }) => {
-            // In "grouped by store" mode, drop in a heading row each time
-            // the store changes — items with no matched product at all fall
-            // under a trailing "Unmatched" heading rather than being hidden.
-            const showStoreHeading = sortMode === 'store' && effectiveStore !== lastStoreHeading
-            if (sortMode === 'store') lastStoreHeading = effectiveStore ?? undefined
+          let lastHeading: string | null | undefined
+          return sortedItems?.map(({ item, matches, effectiveGroceryItemId, effectiveStore, effectiveAisleLabel }) => {
+            // In "grouped by store"/"store + aisle" mode, drop in a heading
+            // row each time the group changes — items with no matched
+            // product at all fall under a trailing "Unmatched" heading
+            // rather than being hidden.
+            const heading = groupHeading(sortMode, effectiveStore, effectiveAisleLabel)
+            const showHeading = heading !== null && heading !== lastHeading
+            if (heading !== null) lastHeading = heading
 
             return (
               <Fragment key={item.id}>
-                {showStoreHeading && (
+                {showHeading && (
                   <li className="bg-slate-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {effectiveStore ?? 'Unmatched'}
+                    {heading}
                   </li>
                 )}
                 <li className="flex items-center justify-between gap-3 px-4 py-3">
@@ -433,7 +460,7 @@ export function ShoppingListDetailView({
                     </div>
                     {/* Packs needed of the matched product, to the right of
                         the dropdown. */}
-                    <span className="w-10 shrink-0 text-xs text-slate-500">
+                    <span className="w-10 shrink-0 text-base font-semibold text-slate-600">
                       {item.packs_needed != null ? `× ${item.packs_needed}` : ''}
                     </span>
                     {/* Total cost for this row: packs needed × pack price. */}
