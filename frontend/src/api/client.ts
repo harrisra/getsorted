@@ -27,7 +27,31 @@ function getCookie(name: string): string | null {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE'])
 
-async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+const TOKEN_REFRESH_PATH = '/api/auth/token/refresh/'
+
+// The access token cookie is short-lived (5 min); the refresh token cookie
+// lasts much longer. Rather than proactively renewing on a timer, we renew
+// lazily the first time a request comes back 401 and retry it once. Callers
+// that race each other share a single in-flight refresh instead of each
+// firing their own.
+let refreshPromise: Promise<boolean> | null = null
+
+function refreshAccessToken(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_BASE_URL}${TOKEN_REFRESH_PATH}`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+      .then((response) => response.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+  return refreshPromise
+}
+
+async function apiFetch(path: string, options: RequestInit = {}, isRetry = false): Promise<Response> {
   const method = (options.method ?? 'GET').toUpperCase()
   const csrfToken = getCookie('csrftoken')
   // FormData bodies must NOT have Content-Type set manually — the browser
@@ -43,6 +67,11 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<Respon
       ...options.headers,
     },
   })
+
+  if (response.status === 401 && !isRetry && path !== TOKEN_REFRESH_PATH) {
+    const refreshed = await refreshAccessToken()
+    if (refreshed) return apiFetch(path, options, true)
+  }
 
   if (!response.ok) {
     let fieldErrors: Record<string, string[]> = {}
@@ -92,9 +121,17 @@ export async function logout(): Promise<void> {
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser | null> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/user/`, {
+  let response = await fetch(`${API_BASE_URL}/api/auth/user/`, {
     credentials: 'include',
   })
+  // On page load the access token cookie may have already expired even
+  // though the longer-lived refresh cookie is still good — try once to
+  // renew before concluding the user is logged out.
+  if (response.status === 401 && (await refreshAccessToken())) {
+    response = await fetch(`${API_BASE_URL}/api/auth/user/`, {
+      credentials: 'include',
+    })
+  }
   if (!response.ok) return null
   return response.json()
 }
