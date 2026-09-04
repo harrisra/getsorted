@@ -181,6 +181,17 @@ ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_UNIQUE_EMAIL = True
 
+# Without these, a Google login whose email matches an existing (non-Google)
+# account can't be linked automatically — allauth refuses to auto-signup on a
+# conflicting email and instead tries to redirect to its own HTML "connect
+# this account" page, which doesn't exist in this API-only project and 500s.
+# AUTO_CONNECT does the linking itself instead. Note: the first time it links
+# an account whose email isn't yet verified, it wipes that account's local
+# password (an anti-takeover safeguard) — run `manage.py verify_existing_emails`
+# once per environment before relying on this for pre-existing users.
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "APP": {
