@@ -143,6 +143,15 @@ export async function logout(): Promise<void> {
   await apiFetch('/api/auth/logout/', { method: 'POST' })
 }
 
+// Exchanges a Google OAuth access token (obtained client-side) for our own
+// JWT cookies — see accounts.views.GoogleLogin on the backend.
+export async function googleLogin(accessToken: string): Promise<void> {
+  await apiFetch('/api/auth/google/', {
+    method: 'POST',
+    body: JSON.stringify({ access_token: accessToken }),
+  })
+}
+
 export async function fetchCurrentUser(): Promise<CurrentUser | null> {
   let response = await fetch(`${API_BASE_URL}/api/auth/user/`, {
     credentials: 'include',

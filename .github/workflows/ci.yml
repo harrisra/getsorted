@@ -61,7 +61,9 @@ jobs:
           context: frontend
           target: prod
           push: true
-          build-args: VITE_API_BASE_URL=https://getsorted-api-dev.harristribelabs.co.uk
+          build-args: |
+            VITE_API_BASE_URL=https://getsorted-api-dev.harristribelabs.co.uk
+            VITE_GOOGLE_OAUTH_CLIENT_ID=${{ vars.VITE_GOOGLE_OAUTH_CLIENT_ID }}
           tags: |
             ${{ env.FRONTEND_IMAGE }}:dev-${{ steps.sha.outputs.short }}
             ${{ env.FRONTEND_IMAGE }}:dev-latest
@@ -86,7 +88,9 @@ jobs:
           context: frontend
           target: prod
           push: true
-          build-args: VITE_API_BASE_URL=https://getsorted-api-test.harristribelabs.co.uk
+          build-args: |
+            VITE_API_BASE_URL=https://getsorted-api-test.harristribelabs.co.uk
+            VITE_GOOGLE_OAUTH_CLIENT_ID=${{ vars.VITE_GOOGLE_OAUTH_CLIENT_ID }}
           tags: |
             ${{ env.FRONTEND_IMAGE }}:test-${{ steps.sha.outputs.short }}
             ${{ env.FRONTEND_IMAGE }}:test-latest
@@ -111,7 +115,9 @@ jobs:
           context: frontend
           target: prod
           push: true
-          build-args: VITE_API_BASE_URL=https://getsorted-api.harristribelabs.co.uk
+          build-args: |
+            VITE_API_BASE_URL=https://getsorted-api.harristribelabs.co.uk
+            VITE_GOOGLE_OAUTH_CLIENT_ID=${{ vars.VITE_GOOGLE_OAUTH_CLIENT_ID }}
           tags: |
             ${{ env.FRONTEND_IMAGE }}:prod-${{ steps.sha.outputs.short }}
             ${{ env.FRONTEND_IMAGE }}:prod-latest

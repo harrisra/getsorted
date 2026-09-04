@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import {
   type CurrentUser,
   fetchCurrentUser,
+  googleLogin as apiGoogleLogin,
   login as apiLogin,
   logout as apiLogout,
   onSilentTokenRefresh,
@@ -14,6 +15,7 @@ interface AuthContextValue {
   user: CurrentUser | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
+  googleLogin: (accessToken: string) => Promise<void>
   signup: (email: string, password1: string, password2: string) => Promise<void>
   logout: () => Promise<void>
   updateProfile: (firstName: string, lastName: string) => Promise<void>
@@ -59,6 +61,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await refresh()
   }, [refresh])
 
+  const googleLogin = useCallback(async (accessToken: string) => {
+    await apiGoogleLogin(accessToken)
+    await refresh()
+  }, [refresh])
+
   const signup = useCallback(async (email: string, password1: string, password2: string) => {
     await apiSignup(email, password1, password2)
     await refresh()
@@ -74,7 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, updateProfile }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, googleLogin, signup, logout, updateProfile }}
+    >
       {children}
     </AuthContext.Provider>
   )

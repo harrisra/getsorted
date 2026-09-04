@@ -42,6 +42,9 @@ services:
       - "5173:5173"
     environment:
       VITE_API_BASE_URL: http://localhost:8000
+      # Same underlying client as the backend's GOOGLE_OAUTH_CLIENT_ID above —
+      # this half is public (baked into the bundle), so it's fine client-side.
+      VITE_GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
     depends_on:
       - backend
 

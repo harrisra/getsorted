@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { useGoogleLogin } from '@react-oauth/google'
 import { ApiError } from '../api/client'
+import { GoogleIcon } from '../icons'
 import { useAuth } from './AuthContext'
+
+// Empty when Google OAuth hasn't been set up yet — see .env.example.
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID ?? ''
 
 type Mode = 'login' | 'signup'
 
 export function AuthPage() {
-  const { login, signup } = useAuth()
+  const { login, googleLogin, signup } = useAuth()
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -46,6 +51,22 @@ export function AuthPage() {
       setSubmitting(false)
     }
   }
+
+  const triggerGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setErrors([])
+      setNotice(null)
+      setSubmitting(true)
+      try {
+        await googleLogin(tokenResponse.access_token)
+      } catch {
+        setErrors(['Google sign-in failed. Please try again.'])
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    onError: () => setErrors(['Google sign-in failed. Please try again.']),
+  })
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -145,6 +166,26 @@ export function AuthPage() {
             {submitting ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Sign up'}
           </button>
         </form>
+
+        {GOOGLE_CLIENT_ID && (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-xs text-slate-400">or</span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => triggerGoogleLogin()}
+              disabled={submitting}
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              <GoogleIcon className="h-4 w-4" />
+              Continue with Google
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
