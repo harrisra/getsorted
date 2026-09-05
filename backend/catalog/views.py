@@ -1,5 +1,6 @@
 import json
 import re
+from html import unescape as unescape_html
 
 import requests
 from rest_framework import status, viewsets
@@ -240,7 +241,11 @@ def _scrape_trolley_product(trolley_url):
             status.HTTP_502_BAD_GATEWAY,
         )
 
-    raw_name = (product.get("name") or "").strip()
+    # trolley.co.uk's JSON-LD embeds its name HTML-entity-escaped (e.g.
+    # "Sainsbury&#039;s ..." for "Sainsbury's ..."), even though it's JSON
+    # rather than HTML at this point — unescape so the stored name reads
+    # the way a person would type it.
+    raw_name = unescape_html((product.get("name") or "").strip())
     if not raw_name:
         return None, (
             {"detail": "Could not determine the product name from that trolley.co.uk page."},
