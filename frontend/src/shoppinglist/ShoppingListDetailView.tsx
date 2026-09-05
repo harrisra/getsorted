@@ -619,8 +619,13 @@ export function ShoppingListDetailView({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[30rem_1fr]">
-        {/* Left panel: building the list, rather than looking at it. */}
-        <div className="divide-y divide-slate-200 border border-slate-200">
+        {/* Left panel: building the list, rather than looking at it. Sized
+            off the viewport (not the right panel's own height, which grows
+            with however many items are on the list) and sticky, with its
+            own overflow-y-auto — so it stays fully in view and scrolls
+            independently instead of stretching to match, and scrolling
+            away with, the item list beside it. */}
+        <div className="divide-y divide-slate-200 overflow-y-auto border border-slate-200 lg:sticky lg:top-8 lg:h-[calc(100vh-4rem)] lg:self-start">
           <AccordionSection
             title="Generate from planned meals"
             isOpen={openSection === 'generate'}
