@@ -8,6 +8,13 @@ RUN npm install
 # --- dev: Vite dev server with HMR, source mounted as a volume -------------
 FROM base AS dev
 
+# Only needed here (not build/prod, which get VITE_GIT_SHA from CI's build-
+# arg instead) — vite.config.ts shells out to it to show the current commit
+# in local dev too, using the repo's .git bind-mounted in by docker-compose.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY . .
 EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host"]

@@ -37,6 +37,11 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      # Read-only so vite.config.ts can shell out to `git rev-parse` for the
+      # build-SHA badge in local dev too — the working tree itself isn't
+      # here (only frontend/ is bind-mounted above), just the metadata git
+      # needs to resolve the current commit.
+      - ./.git:/app/.git:ro
     ports:
       - "5173:5173"
     environment:
@@ -44,9 +49,8 @@ services:
       # Same underlying client as the backend's GOOGLE_OAUTH_CLIENT_ID above —
       # this half is public (baked into the bundle), so it's fine client-side.
       VITE_GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
-      # Only set if you export VITE_GIT_SHA yourself before `docker compose
-      # up` — CI sets this for real deployments (see .github/workflows/ci.yml);
-      # local dev just shows no build badge without it.
+      # Overrides vite.config.ts's own `git rev-parse` detection if set —
+      # not needed for the common case, just an escape hatch.
       VITE_GIT_SHA: ${VITE_GIT_SHA:-}
     depends_on:
       - backend
