@@ -220,26 +220,24 @@ export function ItemGroceryMatchesEditor<T extends QuantifiedItem>({
           return (
           <div
             key={index}
-            className="grid grid-cols-1 gap-3 rounded-md border border-slate-100 p-2 lg:grid-cols-2"
+            className="grid grid-cols-1 gap-3 rounded-md border border-slate-100 p-2 lg:grid-cols-[5rem_1fr_1fr]"
           >
-            {/* Left: this row's own details, with the cheapest matched
-                product's photo as a faint background (behind the inputs,
-                which stay opaque so they're still legible) — a quick visual
-                cue of what's actually being bought here. Right: what it's
-                matched to — split into two columns (rather than the
-                matches stacked below, indented) so a row's details and its
-                matches line up side by side instead of one on top of the
-                other. */}
-            <div
-              className="flex flex-col gap-2 rounded-md bg-cover bg-center p-2"
-              style={
-                cheapestImage
-                  ? {
-                      backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.88)), url("${cheapestImage}")`,
-                    }
-                  : undefined
-              }
-            >
+            {/* First: the cheapest matched product's photo, as a quick
+                visual cue of what's actually being bought here. Then this
+                row's own details, then what it's matched to — split into
+                separate columns (rather than the matches stacked below,
+                indented) so a row's photo, details, and matches all line up
+                side by side instead of one on top of the other. */}
+            <div className="flex items-center justify-center lg:justify-start">
+              {cheapestImage && (
+                <img
+                  src={cheapestImage}
+                  alt=""
+                  className="h-16 w-16 shrink-0 rounded border border-slate-200 object-cover"
+                />
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <input
                   type="text"
