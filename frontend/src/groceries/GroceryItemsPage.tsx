@@ -11,6 +11,7 @@ import {
   fetchGroceryItems,
   fetchStores,
   populateGroceryItemFromTrolley,
+  refreshGroceryItemPrice,
   updateGroceryItem,
 } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
@@ -54,6 +55,11 @@ export function GroceryItemsPage() {
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
+  const [refreshingAll, setRefreshingAll] = useState(false)
+  const [refreshAllProgress, setRefreshAllProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  )
+  const [refreshAllMessage, setRefreshAllMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function refresh() {
@@ -221,6 +227,44 @@ export function GroceryItemsPage() {
     }
   }
 
+  // Refreshes every item with a trolley_url set, one at a time — each hits
+  // trolley.co.uk for real (via the backend's refresh-price action), so
+  // this runs sequentially rather than all at once, both to avoid hammering
+  // trolley.co.uk with a burst of simultaneous requests and to keep a
+  // simple running "done/total" count to show while it works.
+  async function handleRefreshAllPrices() {
+    if (!items) return
+    const targets = items.filter((i) => i.trolley_url)
+    if (targets.length === 0) return
+
+    setRefreshAllMessage(null)
+    setRefreshingAll(true)
+    setRefreshAllProgress({ done: 0, total: targets.length })
+
+    let succeeded = 0
+    const errors: string[] = []
+    for (const item of targets) {
+      try {
+        await refreshGroceryItemPrice(item.id, item.trolley_url)
+        succeeded++
+      } catch (err) {
+        const detail =
+          err instanceof ApiError
+            ? Object.values(err.fieldErrors).flat().join(' ')
+            : 'Something went wrong.'
+        errors.push(`${item.name}: ${detail}`)
+      }
+      setRefreshAllProgress((prev) => (prev ? { ...prev, done: prev.done + 1 } : prev))
+    }
+
+    await refresh()
+    const parts = [`Refreshed ${succeeded} of ${targets.length} item(s) with a trolley.co.uk URL.`]
+    if (errors.length > 0) parts.push(...errors)
+    setRefreshAllMessage(parts.join(' '))
+    setRefreshingAll(false)
+    setRefreshAllProgress(null)
+  }
+
   return (
     <div className="mx-auto max-w-[58.8rem] space-y-6 p-4 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -264,6 +308,17 @@ export function GroceryItemsPage() {
           >
             Delete selected ({selectedIds.size})
           </ConfirmDeleteButton>
+          <button
+            type="button"
+            onClick={handleRefreshAllPrices}
+            disabled={refreshingAll || !items?.some((i) => i.trolley_url)}
+            title="Re-fetch prices from trolley.co.uk for every item with a trolley.co.uk URL"
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+          >
+            {refreshingAll
+              ? `Refreshing… (${refreshAllProgress?.done ?? 0}/${refreshAllProgress?.total ?? 0})`
+              : 'Refresh prices'}
+          </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -313,6 +368,12 @@ export function GroceryItemsPage() {
 
       {deleteMessage && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteMessage}</p>
+      )}
+
+      {refreshAllMessage && (
+        <p className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-700">
+          {refreshAllMessage}
+        </p>
       )}
 
       {showTrolleyForm && (
