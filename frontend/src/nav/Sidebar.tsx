@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { GIT_SHA } from '../api/client'
+import { useEffect, useState } from 'react'
+import { API_BASE_URL, GIT_SHA } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { useHouseholds } from '../households/HouseholdsContext'
 import {
@@ -16,6 +16,24 @@ import {
 } from '../icons'
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'getsorted:sidebarCollapsed'
+
+type BackendHealth = 'checking' | 'ok' | 'error'
+
+function useBackendHealth(): BackendHealth {
+  const [status, setStatus] = useState<BackendHealth>('checking')
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/health/`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Unexpected status ${res.status}`)
+        return res.json()
+      })
+      .then(() => setStatus('ok'))
+      .catch(() => setStatus('error'))
+  }, [])
+
+  return status
+}
 
 export type NavTab =
   | 'account'
@@ -54,6 +72,7 @@ export function Sidebar({
   const { logout } = useAuth()
   const { households, currentHousehold, setCurrentHouseholdId } = useHouseholds()
   const [collapsed, setCollapsed] = useState(loadInitialCollapsed)
+  const backendHealth = useBackendHealth()
 
   const tabs = currentHousehold
     ? TABS
@@ -168,6 +187,35 @@ export function Sidebar({
             </>
           )}
         </button>
+        {collapsed ? (
+          <div
+            className="flex justify-center px-3 py-2"
+            title={`Backend API: ${
+              backendHealth === 'checking'
+                ? 'checking…'
+                : backendHealth === 'ok'
+                  ? 'connected'
+                  : 'unreachable'
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                backendHealth === 'ok'
+                  ? 'bg-green-500'
+                  : backendHealth === 'error'
+                    ? 'bg-red-500'
+                    : 'bg-slate-300'
+              }`}
+            />
+          </div>
+        ) : (
+          <p className="px-3 py-2 text-xs text-slate-400">
+            Backend API:{' '}
+            {backendHealth === 'checking' && 'checking…'}
+            {backendHealth === 'ok' && <span className="text-green-600">connected</span>}
+            {backendHealth === 'error' && <span className="text-red-600">unreachable</span>}
+          </p>
+        )}
       </div>
     </aside>
   )
