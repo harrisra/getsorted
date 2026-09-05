@@ -963,6 +963,11 @@ export function ShoppingListDetailView({
               <p className="text-slate-500">
                 Without promos: £{totalCostWithoutPromo.toFixed(2)}
               </p>
+              {totalCostWithoutPromo > totalCost && (
+                <p className="font-medium text-green-600">
+                  Saving: £{(totalCostWithoutPromo - totalCost).toFixed(2)}
+                </p>
+              )}
             </div>
           )}
         </div>
