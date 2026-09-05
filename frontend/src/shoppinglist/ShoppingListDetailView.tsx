@@ -617,14 +617,19 @@ export function ShoppingListDetailView({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+    <div className="h-full space-y-6">
+      <div className="flex flex-col gap-6 lg:h-full lg:flex-row lg:items-start">
         {/* Left panel: building the list, rather than looking at it. Its
-            own box with a height set from the viewport (not from the right
-            panel's content) and its own overflow-y-auto — a genuinely
+            own box, filling the height its parent actually has available
+            (h-full, chained all the way up from <main> — see
+            ShoppingListsPage's own h-full on its wrapper — rather than a
+            100vh calc that had to guess how much of the viewport other
+            chrome like the footer status bar was taking, which came up
+            short and left <main> itself still needing to scroll too, i.e.
+            two scrollbars) and its own overflow-y-auto — a genuinely
             separate scrolling panel, not a grid/flex column whose height or
             scroll position gets tied to the item list beside it. */}
-        <div className="divide-y divide-slate-200 overflow-y-auto border border-slate-200 lg:h-[calc(100vh-4rem)] lg:w-[30rem] lg:shrink-0">
+        <div className="divide-y divide-slate-200 overflow-y-auto border border-slate-200 lg:h-full lg:w-[30rem] lg:shrink-0">
           <AccordionSection
             title="Generate from planned meals"
             isOpen={openSection === 'generate'}
@@ -846,16 +851,16 @@ export function ShoppingListDetailView({
         </div>
 
         {/* Right panel: the list itself, filling whatever width is left
-            next to the left panel, in its own scrolling box (same viewport-
-            based height as the left panel) rather than the whole page
-            scrolling — that's what let the left panel get dragged along
-            with it before. min-w-0 overrides the flex item's default
+            next to the left panel, in its own scrolling box (same h-full
+            approach as the left panel, so <main> itself never has to
+            scroll — see the note there on why a 100vh calc gave two
+            scrollbars). min-w-0 overrides the flex item's default
             min-width: auto — without it, this column refuses to shrink
             below the item row's intrinsic content width (several
             fixed-width, non-wrapping controls), which was forcing a
             horizontal scrollbar instead of the row content reflowing to
             fit. */}
-        <div className="min-w-0 w-full flex-1 space-y-4 lg:h-[calc(100vh-4rem)] lg:overflow-y-auto">
+        <div className="min-w-0 w-full flex-1 space-y-4 lg:h-full lg:overflow-y-auto">
           {editingName ? (
             <form
               onSubmit={handleRename}

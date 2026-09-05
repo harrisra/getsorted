@@ -50,7 +50,7 @@ export function ShoppingListsPage() {
     // edge and centers the list in whatever's left, which needs the whole
     // viewport width to work with rather than a pre-capped column.
     return (
-      <div className="w-full p-4 sm:p-8">
+      <div className="h-full w-full p-4 sm:p-8">
         <ShoppingListDetailView
           list={selectedList}
           onBack={() => setSelectedListId(null)}
