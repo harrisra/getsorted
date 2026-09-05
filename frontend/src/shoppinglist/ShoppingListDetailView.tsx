@@ -960,13 +960,18 @@ export function ShoppingListDetailView({
           {visibleItems !== null && visibleItems.length > 0 && (
             <div className="text-right text-sm">
               <p className="font-semibold text-slate-800">Total: £{totalCost.toFixed(2)}</p>
-              <p className="text-slate-500">
-                Without promos: £{totalCostWithoutPromo.toFixed(2)}
-              </p>
+              {/* Nothing to contrast against when no item on the list is
+                  currently discounted — totalCostWithoutPromo would just
+                  repeat totalCost. */}
               {totalCostWithoutPromo > totalCost && (
-                <p className="font-medium text-green-600">
-                  Saving: £{(totalCostWithoutPromo - totalCost).toFixed(2)}
-                </p>
+                <>
+                  <p className="text-slate-500">
+                    Without promos: £{totalCostWithoutPromo.toFixed(2)}
+                  </p>
+                  <p className="font-medium text-green-600">
+                    Saving: £{(totalCostWithoutPromo - totalCost).toFixed(2)}
+                  </p>
+                </>
               )}
             </div>
           )}
