@@ -54,6 +54,14 @@ class Household(models.Model):
     members = models.ManyToManyField(
         User, through="Membership", related_name="households"
     )
+    # Stores a newly-created ShoppingList starts with excluded (see
+    # mealplanner.ShoppingList.excluded_stores, which every new list is
+    # seeded from) — lets a household that never shops at, say, Waitrose
+    # skip re-excluding it on every single list rather than starting every
+    # list with every store "in" and excluding the same ones each time.
+    default_excluded_stores = models.ManyToManyField(
+        "catalog.Store", blank=True, related_name="excluded_from_household_defaults"
+    )
 
     def __str__(self):
         return self.name

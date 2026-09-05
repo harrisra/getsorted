@@ -296,6 +296,19 @@ class ShoppingListSerializer(serializers.ModelSerializer):
     def get_created_by_email(self, obj):
         return obj.created_by.email if obj.created_by else None
 
+    def create(self, validated_data):
+        # A freshly-created list has no excluded_stores of its own to speak
+        # of — seed it from the household's default set (see
+        # accounts.Household.default_excluded_stores) unless the client
+        # explicitly specified some itself. Only relevant right after
+        # creation: nothing re-applies this once a list exists, since the
+        # user may since have deliberately changed it away from the default.
+        seed_from_household_defaults = "excluded_stores" not in validated_data
+        shopping_list = super().create(validated_data)
+        if seed_from_household_defaults:
+            shopping_list.excluded_stores.set(shopping_list.household.default_excluded_stores.all())
+        return shopping_list
+
     def update(self, instance, validated_data):
         # Re-optimize every item's store whenever the excluded set actually
         # changes, in either direction — excluding a store moves items away

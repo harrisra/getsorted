@@ -184,6 +184,9 @@ export interface Household {
   id: string
   name: string
   week_start_day: number
+  // Stores a newly-created shopping list starts with excluded — see
+  // ShoppingList.excluded_stores, which every new list is seeded from.
+  default_excluded_stores: string[]
   created_at: string
   role: 'owner' | 'member'
 }
@@ -208,6 +211,17 @@ export async function updateHouseholdWeekStartDay(
   const response = await apiFetch(`/api/accounts/households/${householdId}/`, {
     method: 'PATCH',
     body: JSON.stringify({ week_start_day: weekStartDay }),
+  })
+  return response.json()
+}
+
+export async function updateHouseholdDefaultExcludedStores(
+  householdId: string,
+  excludedStores: string[],
+): Promise<Household> {
+  const response = await apiFetch(`/api/accounts/households/${householdId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ default_excluded_stores: excludedStores }),
   })
   return response.json()
 }

@@ -241,10 +241,11 @@ class ShoppingList(models.Model):
         Household, on_delete=models.CASCADE, related_name="shopping_lists"
     )
     name = models.CharField(max_length=255)
-    # Stores the household isn't planning to visit for this list — empty by
-    # default, so every store starts "in" (the UI shows all of them
-    # depressed/selected) without needing to backfill anything when a list
-    # is created or a new Store is added to the catalog later. Toggling one
+    # Stores the household isn't planning to visit for this list — seeded
+    # from the household's own default_excluded_stores when the list is
+    # created (see ShoppingListSerializer.create), so a store the household
+    # never shops at doesn't need excluding again on every new list; empty
+    # (every store "in") for a household with no defaults set. Toggling one
     # in either direction re-optimizes every item's store on this list —
     # see reoptimize_item_stores.
     excluded_stores = models.ManyToManyField(
