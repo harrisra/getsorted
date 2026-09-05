@@ -618,7 +618,7 @@ export function ShoppingListDetailView({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[30rem_1fr] lg:items-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[30rem_1fr]">
         {/* Left panel: building the list, rather than looking at it. */}
         <div className="divide-y divide-slate-200 border border-slate-200">
           <AccordionSection
