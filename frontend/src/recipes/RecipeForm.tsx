@@ -21,6 +21,21 @@ interface StoreCostPreview {
   isPromo: boolean
 }
 
+// How many of this item's own pack the ingredient's amount needed comes to
+// — e.g. 0.5 for an ingredient needing 250g of a 500g pack, 2 for one
+// needing 1000g of it. null if the item and ingredient share no unit to
+// compare (grams/milliliters/pieces) at all.
+function matchRatio(item: GroceryItem, ingredient: IngredientQuantity): number | null {
+  for (const dimension of ['grams', 'milliliters', 'pieces'] as const) {
+    const itemAmount = item[dimension]
+    const ingredientAmount = ingredient[dimension]
+    if (itemAmount && ingredientAmount != null) {
+      return ingredientAmount / itemAmount
+    }
+  }
+  return null
+}
+
 // Mirrors the backend's RecipeIngredientGroceryItemSerializer.get_store_costs
 // exactly, so a just-added match shows its cost breakdown immediately
 // rather than only after saving: every store the matched product is
@@ -28,15 +43,7 @@ interface StoreCostPreview {
 // both the ingredient and the item share, using each store's promo price
 // when it has one (same as GroceryItemPrice.effective_price on the backend).
 function storeCostPreviews(item: GroceryItem, ingredient: IngredientQuantity): StoreCostPreview[] {
-  let ratio: number | null = null
-  for (const dimension of ['grams', 'milliliters', 'pieces'] as const) {
-    const itemAmount = item[dimension]
-    const ingredientAmount = ingredient[dimension]
-    if (itemAmount && ingredientAmount != null) {
-      ratio = ingredientAmount / itemAmount
-      break
-    }
-  }
+  const ratio = matchRatio(item, ingredient)
   return item.store_prices.map((sp) => {
     const effectivePrice = sp.promo_price ?? sp.price
     return {
@@ -483,14 +490,32 @@ export function RecipeForm({
                 {ingredient.grocery_matches.map((match) => {
                   const item = groceryItems.find((gi) => gi.id === match.grocery_item)
                   const costs = item ? storeCostPreviews(item, ingredient) : []
+                  const ratio = item ? matchRatio(item, ingredient) : null
+                  // Flagged whenever this product's own pack size doesn't
+                  // land on exactly one pack for the amount needed — either
+                  // more than one pack required, or less than a whole pack
+                  // (leftover) — so it's obvious at a glance which matches
+                  // don't cleanly cover the ingredient. A small tolerance
+                  // avoids flagging harmless floating-point noise around 1.
+                  const ratioMismatch = ratio != null && Math.abs(ratio - 1) > 0.01
                   return (
                     <div
                       key={match.grocery_item}
                       className="space-y-0.5 rounded-md bg-slate-50 px-2 py-1 text-xs"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate font-medium text-slate-700">
-                          {item ? item.name : 'Unknown item'}
+                        <span className="flex min-w-0 items-center gap-1">
+                          <span className="min-w-0 truncate font-medium text-slate-700">
+                            {item ? item.name : 'Unknown item'}
+                          </span>
+                          {ratioMismatch && (
+                            <span
+                              title="This product's pack size doesn't come to exactly one pack for the amount needed"
+                              className="shrink-0 font-semibold text-red-600"
+                            >
+                              ×{Math.round(ratio! * 100) / 100}
+                            </span>
+                          )}
                         </span>
                         <button
                           type="button"
