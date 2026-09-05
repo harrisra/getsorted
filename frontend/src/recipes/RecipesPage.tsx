@@ -30,16 +30,6 @@ function pricedIngredientCount(recipe: Recipe): number {
   return recipe.ingredients.filter((ing) => ing.line_cost != null).length
 }
 
-// True if any ingredient is matched to a product currently on a
-// promotional/loyalty-card price at some store — regardless of whether
-// that's the store actually driving the recipe's own cost total, which
-// stays on regular prices only (see GroceryMatchStoreCost.promo_price).
-function recipeHasPromoPrice(recipe: Recipe): boolean {
-  return recipe.ingredients.some((ing) =>
-    ing.grocery_matches.some((match) => match.store_costs.some((sc) => sc.promo_price != null)),
-  )
-}
-
 export function RecipesPage() {
   const { user } = useAuth()
   const { currentHousehold } = useHouseholds()
@@ -327,11 +317,11 @@ export function RecipesPage() {
           <li
             key={recipe.id}
             title={
-              recipeHasPromoPrice(recipe)
+              recipe.has_promo_price
                 ? 'One or more ingredients are matched to a product currently on a promo/loyalty-card price'
                 : undefined
             }
-            className={`px-4 py-3 ${recipeHasPromoPrice(recipe) ? 'bg-amber-50' : ''}`}
+            className={`px-4 py-3 ${recipe.has_promo_price ? 'bg-amber-50' : ''}`}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-3">

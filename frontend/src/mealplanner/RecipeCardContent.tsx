@@ -10,7 +10,14 @@ const MEAL_TYPE_LABELS: Record<Recipe['meal_type'], string> = {
 export function RecipeCardContent({ recipe, className = '' }: { recipe: Recipe; className?: string }) {
   return (
     <div
-      className={`flex w-40 flex-col gap-1.5 rounded-lg border border-slate-200 bg-white p-2 shadow-sm ${className}`}
+      title={
+        recipe.has_promo_price
+          ? 'One or more ingredients are matched to a product currently on a promo/loyalty-card price'
+          : undefined
+      }
+      className={`flex w-40 flex-col gap-1.5 rounded-lg border border-slate-200 p-2 shadow-sm ${
+        recipe.has_promo_price ? 'bg-amber-50' : 'bg-white'
+      } ${className}`}
     >
       {recipe.image ? (
         <img

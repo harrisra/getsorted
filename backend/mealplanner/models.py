@@ -71,6 +71,20 @@ class Recipe(models.Model):
         ]
         return sum(prices) if prices else None
 
+    @property
+    def has_promo_price(self):
+        """True if any ingredient is matched to a product currently on a
+        promotional/loyalty-card price at some store — used to highlight
+        the recipe (RecipesPage, meal planner cards), not for current_cost
+        or any other cost calculation, which stay on regular prices only.
+        """
+        return any(
+            price_row.promo_price is not None
+            for ingredient in self.ingredients.all()
+            for match in ingredient.grocery_matches.all()
+            for price_row in match.grocery_item.store_prices.all()
+        )
+
 
 class RecipeIngredient(models.Model):
     """One ingredient line within a Recipe.

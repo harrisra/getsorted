@@ -534,13 +534,17 @@ export interface Recipe {
   image_url: string
   ingredients: RecipeIngredient[]
   current_cost: string | null
+  // True if any ingredient is matched to a product currently on a
+  // promotional/loyalty-card price at some store — used to highlight the
+  // recipe, not part of current_cost (which stays on regular prices only).
+  has_promo_price: boolean
   created_by: string | null
   created_at: string
 }
 
 export type RecipeInput = Omit<
   Recipe,
-  'id' | 'image' | 'current_cost' | 'created_by' | 'created_at' | 'ingredients'
+  'id' | 'image' | 'current_cost' | 'has_promo_price' | 'created_by' | 'created_at' | 'ingredients'
 > & {
   ingredients: RecipeIngredientInput[]
 }
@@ -591,6 +595,7 @@ export interface RecipeSummary {
   servings: number
   current_cost: string | null
   image: string | null
+  has_promo_price: boolean
 }
 
 export interface MealSlot {

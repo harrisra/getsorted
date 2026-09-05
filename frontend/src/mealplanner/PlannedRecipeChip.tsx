@@ -27,9 +27,14 @@ export function PlannedRecipeChip({
   return (
     <div
       ref={setNodeRef}
-      className={`flex items-start justify-between gap-1 rounded bg-slate-100 px-1.5 py-1.5 text-xs ${
-        isDragging ? 'opacity-30' : ''
-      }`}
+      title={
+        recipe.has_promo_price
+          ? 'One or more ingredients are matched to a product currently on a promo/loyalty-card price'
+          : undefined
+      }
+      className={`flex items-start justify-between gap-1 rounded px-1.5 py-1.5 text-xs ${
+        recipe.has_promo_price ? 'bg-amber-100' : 'bg-slate-100'
+      } ${isDragging ? 'opacity-30' : ''}`}
     >
       <span className="flex min-w-0 items-start gap-1">
         <button

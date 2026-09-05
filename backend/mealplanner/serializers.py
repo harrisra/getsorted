@@ -142,6 +142,7 @@ class RecipeSerializer(RecipeImageMixin, serializers.ModelSerializer):
     ingredients = RecipeIngredientSerializer(many=True, required=False)
     current_cost = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+    has_promo_price = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Recipe
@@ -157,6 +158,7 @@ class RecipeSerializer(RecipeImageMixin, serializers.ModelSerializer):
             "image_url",
             "ingredients",
             "current_cost",
+            "has_promo_price",
             "created_by",
             "created_at",
         ]
@@ -203,10 +205,11 @@ class RecipeSerializer(RecipeImageMixin, serializers.ModelSerializer):
 class RecipeSummarySerializer(RecipeImageMixin, serializers.ModelSerializer):
     current_cost = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+    has_promo_price = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Recipe
-        fields = ["id", "name", "meal_type", "servings", "current_cost", "image"]
+        fields = ["id", "name", "meal_type", "servings", "current_cost", "image", "has_promo_price"]
 
     def get_current_cost(self, recipe):
         cost = recipe.current_cost
