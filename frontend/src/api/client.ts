@@ -1,10 +1,5 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
-// The only account the /populate/ and /scrape/ grocery-item lookups are
-// available to — mirrors backend/catalog/views.py's SCRAPE_ALLOWED_EMAIL.
-// Just hides the buttons here; the backend enforces it for real.
-export const SCRAPE_ALLOWED_EMAIL = 'rob.harris@harristribe.co.uk'
-
 export interface CurrentUser {
   pk: string
   email: string
@@ -361,56 +356,6 @@ export async function refreshGroceryItemPrice(
     body: JSON.stringify({ trolley_url: trolleyUrl || '' }),
   })
   return response.json()
-}
-
-export interface PopulateResult {
-  /** A matched Store id, or null if the URL's domain didn't confidently
-   * match one of the known stores — see store_name. */
-  store: string | null
-  /** Best-effort store name guessed from the URL, shown even when `store`
-   * couldn't be matched so the user knows what to pick manually. */
-  store_name: string
-  name: string
-  grams: number | null
-  pieces: number | null
-  milliliters: number | null
-  price: string | null
-  product_url: string
-  image_url: string
-  matched_exact: boolean
-}
-
-export async function populateGroceryItem(
-  name: string,
-  productUrl: string,
-): Promise<PopulateResult> {
-  const response = await apiFetch('/api/catalog/grocery-items/populate/', {
-    method: 'POST',
-    body: JSON.stringify({ name, product_url: productUrl }),
-  })
-  return response.json()
-}
-
-export interface ScrapeResultRow {
-  url: string
-  status: 'created' | 'error'
-  detail?: string
-  item?: GroceryItem
-  /** Whether the lookup confidently matched the exact product at this URL,
-   * or just the closest thing found in Pepesto's cached catalog — only
-   * present when status is 'created'. */
-  matched_exact?: boolean
-}
-
-// Bulk-creates grocery items from a plain-text list of product URLs (one
-// per line) — each line succeeds or fails independently, see ScrapeResultRow.
-export async function scrapeGroceryItems(urls: string): Promise<ScrapeResultRow[]> {
-  const response = await apiFetch('/api/catalog/grocery-items/scrape/', {
-    method: 'POST',
-    body: JSON.stringify({ urls }),
-  })
-  const data = await response.json()
-  return data.results
 }
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'

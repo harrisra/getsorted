@@ -27,7 +27,6 @@ services:
       CSRF_TRUSTED_ORIGINS: http://localhost:5173
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
-      PEPESTO_API_KEY: ${PEPESTO_API_KEY:-}
     depends_on:
       - db
 

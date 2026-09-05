@@ -58,17 +58,6 @@ class GroceryItemSerializer(serializers.ModelSerializer):
         return value
 
 
-class PopulateRequestSerializer(serializers.Serializer):
-    name = serializers.CharField(
-        help_text="A rough product description, e.g. 'Tesco British Cooked Ham Slices 120g'."
-    )
-    product_url = serializers.URLField()
-
-
-class ScrapeRequestSerializer(serializers.Serializer):
-    urls = serializers.CharField(help_text="One product URL per line.")
-
-
 class RefreshPriceRequestSerializer(serializers.Serializer):
     # Optional: lets the caller refresh against a trolley_url that's only
     # sitting in an unsaved edit (see GroceryItemViewSet.refresh_price) —

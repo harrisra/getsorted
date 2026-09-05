@@ -83,19 +83,19 @@ its own copy. Deliberately **not** Household-scoped, the one exception to the
 sub-app convention above; any signed-in user can view/add/edit entries, but only
 the account that created an entry (`created_by`) can delete it.
 
-It also fetches product data from external sources on the user's behalf, all under
-`/api/catalog/grocery-items/`:
+It also has one action that fetches product data on the user's behalf:
+`/api/catalog/grocery-items/{id}/refresh-price/` re-fetches an item's price from
+its `trolley_url` (a trolley.co.uk product page) by scraping that page's own
+per-store comparison table, and is open to any signed-in user (no third-party API
+cost, no bot-block risk — see `_scrape_trolley_price` in `catalog/views.py`).
 
-- `refresh-price` — re-fetches an item's price from its `trolley_url` (a
-  trolley.co.uk product page) by scraping that page's own per-store comparison
-  table, and open to any signed-in user (no third-party API cost, no bot-block
-  risk — see `_scrape_trolley_price` in `catalog/views.py`).
-- `populate` / `scrape` — look up store/name/size/price from a pasted product URL
-  via the paid Pepesto API (`PEPESTO_API_KEY`), or via Sainsbury's own product
-  search for sainsburys.co.uk URLs specifically. Restricted to
-  `rob.harris@harristribe.co.uk` only (`SCRAPE_ALLOWED_EMAIL` in
-  `catalog/views.py`), since these call paid/rate-limited third-party services on
-  the caller's behalf.
+> Pepesto (paid product-lookup API) and a Sainsbury's-own-search scrape used to
+> back "Populate"/"Scrape URLs" buttons on this page, matching a pasted product
+> URL to a store/name/size/price. Rob stopped using both — removed from the
+> codebase (backend `catalog/views.py` and `serializers.py`, frontend
+> `groceries/GroceryItemForm.tsx` and `GroceryItemsPage.tsx`, the
+> `PEPESTO_API_KEY` setting/env var) rather than left dormant. `refresh-price`
+> above is unrelated and unaffected.
 
 ## Conventions
 
@@ -129,8 +129,6 @@ by `docker-compose.yml`:
 
 - `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` — Google login. Without
   them, everything else (admin, email/password auth, meal planner API) still works.
-- `PEPESTO_API_KEY` — used by the `catalog` app's price-fetching (e.g. the
-  trolley.co.uk integration); leave blank to develop without live price lookups.
 
 Editing either Dockerfile's `dev` stage, `docker-compose.yml` itself, or
 `requirements.txt`/`package.json` needs `docker compose up --build` (or
