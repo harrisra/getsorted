@@ -21,6 +21,7 @@ import {
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { PencilIcon } from '../icons'
 import { addDays, formatDateISO, formatDayHeading } from '../mealplanner/dates'
+import { StoreLogo } from '../StoreLogo'
 
 // Cheapest first — priced options before unpriced ones, since there's
 // nothing to compare an unpriced one on.
@@ -658,7 +659,8 @@ export function ShoppingListDetailView({
                     </div>
                   </div>
                   {/* Store column, between the item name and the Add button. */}
-                  <span className="w-24 shrink-0 truncate text-xs text-slate-500">
+                  <span className="flex w-24 shrink-0 items-center gap-1 truncate text-xs text-slate-500">
+                    <StoreLogo name={option.storeName} className="h-3 w-auto shrink-0" />
                     {option.storeName}
                   </span>
                   <button
@@ -761,12 +763,13 @@ export function ShoppingListDetailView({
                         ? `Not going to ${store.name}? Click to move its items elsewhere.`
                         : `Visit ${store.name} after all.`
                     }
-                    className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
+                    className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition ${
                       visiting
                         ? 'border-slate-800 bg-slate-800 text-white'
                         : 'border-slate-300 text-slate-700 hover:bg-slate-100'
                     }`}
                   >
+                    <StoreLogo name={store.name} className="h-4 w-auto shrink-0" />
                     {store.name}
                   </button>
                 )

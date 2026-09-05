@@ -9,6 +9,7 @@ import {
   fetchStores,
   refreshGroceryItemPrice,
 } from '../api/client'
+import { StoreLogo } from '../StoreLogo'
 
 const EMPTY: GroceryItemInput = {
   name: '',
@@ -274,7 +275,8 @@ export function GroceryItemForm({
                 key={sp.store}
                 className="flex flex-wrap items-center gap-2 rounded-md border border-slate-100 p-2"
               >
-                <span className="min-w-[6rem] flex-1 text-sm font-medium text-slate-700">
+                <span className="flex min-w-[6rem] flex-1 items-center gap-1.5 text-sm font-medium text-slate-700">
+                  {store && <StoreLogo name={store.name} className="h-4 w-auto shrink-0" />}
                   {store?.name ?? 'Unknown store'}
                 </span>
                 <input
