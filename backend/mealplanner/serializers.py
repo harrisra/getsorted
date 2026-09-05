@@ -70,18 +70,19 @@ class RecipeIngredientGroceryItemSerializer(serializers.ModelSerializer):
         results = []
         for price_row in item.store_prices.all():
             cost = None
-            if ratio is not None and price_row.price is not None:
-                cost = (price_row.price * ratio).quantize(Decimal("0.01"))
+            effective_price = price_row.effective_price
+            if ratio is not None and effective_price is not None:
+                cost = (effective_price * ratio).quantize(Decimal("0.01"))
             results.append(
                 {
                     "store": price_row.store_id,
                     "store_name": price_row.store.name,
                     "price": str(price_row.price) if price_row.price is not None else None,
+                    # Reflects effective_price (promo when there is one),
+                    # same as RecipeIngredient.store_costs/line_cost and
+                    # Recipe.current_cost — this is what buying it here
+                    # actually costs right now, not necessarily `price` above.
                     "line_cost": str(cost) if cost is not None else None,
-                    # Exposed for callers to flag "this ingredient has a
-                    # current promo" (e.g. RecipesPage's highlight) — not
-                    # used in line_cost/cost calculations, which stay on the
-                    # regular price only (see catalog.GroceryItemPrice.promo_price).
                     "promo_price": str(price_row.promo_price) if price_row.promo_price is not None else None,
                 }
             )

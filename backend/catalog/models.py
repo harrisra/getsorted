@@ -136,3 +136,14 @@ class GroceryItemPrice(models.Model):
 
     def __str__(self):
         return f"{self.grocery_item.name} @ {self.store.name}"
+
+    @property
+    def effective_price(self):
+        """The price actually payable right now: the promo price when
+        there is one (it's a discount off `price`, never a markup), else
+        the regular price. Single source of truth for anything computing a
+        cost from this row — recipe/shopping-list cost math included —
+        rather than each caller re-deciding whether to prefer promo_price."""
+        if self.promo_price is not None:
+            return self.promo_price
+        return self.price

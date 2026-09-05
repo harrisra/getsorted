@@ -24,7 +24,8 @@ interface StoreCostPreview {
 // exactly, so a just-added match shows its cost breakdown immediately
 // rather than only after saving: every store the matched product is
 // currently priced at, scaled by whichever unit (grams/milliliters/pieces)
-// both the ingredient and the item share.
+// both the ingredient and the item share, using each store's promo price
+// when it has one (same as GroceryItemPrice.effective_price on the backend).
 function storeCostPreviews(item: GroceryItem, ingredient: IngredientQuantity): StoreCostPreview[] {
   let ratio: number | null = null
   for (const dimension of ['grams', 'milliliters', 'pieces'] as const) {
@@ -35,11 +36,15 @@ function storeCostPreviews(item: GroceryItem, ingredient: IngredientQuantity): S
       break
     }
   }
-  return item.store_prices.map((sp) => ({
-    store: sp.store,
-    storeName: sp.store_detail.name,
-    lineCost: ratio != null && sp.price != null ? Math.round(Number(sp.price) * ratio * 100) / 100 : null,
-  }))
+  return item.store_prices.map((sp) => {
+    const effectivePrice = sp.promo_price ?? sp.price
+    return {
+      store: sp.store,
+      storeName: sp.store_detail.name,
+      lineCost:
+        ratio != null && effectivePrice != null ? Math.round(Number(effectivePrice) * ratio * 100) / 100 : null,
+    }
+  })
 }
 
 const EMPTY: RecipeFormValues = {

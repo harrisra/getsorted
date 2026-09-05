@@ -483,11 +483,13 @@ export interface GroceryMatchStoreCost {
   store: string
   store_name: string
   price: string | null
+  // Uses the promo price when this store currently has one (it's cheaper
+  // than `price`, never worse) — same as Recipe.current_cost.
   line_cost: string | null
   // This store's current promotional/loyalty-card price, if it has one
   // right now — reported for callers that want to flag "this ingredient
-  // has a current promo" (e.g. highlighting a recipe), not used in
-  // line_cost/cost calculations, which stay on the regular price only.
+  // has a current promo" (e.g. highlighting a recipe). Already folded into
+  // line_cost above; exposed separately just for display.
   promo_price: string | null
 }
 
@@ -536,7 +538,9 @@ export interface Recipe {
   current_cost: string | null
   // True if any ingredient is matched to a product currently on a
   // promotional/loyalty-card price at some store — used to highlight the
-  // recipe, not part of current_cost (which stays on regular prices only).
+  // recipe. current_cost above already factors the promo price in when
+  // it's the cheaper option, so this is an informational flag, not a
+  // separate cost.
   has_promo_price: boolean
   created_by: string | null
   created_at: string

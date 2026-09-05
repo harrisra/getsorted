@@ -75,8 +75,10 @@ class Recipe(models.Model):
     def has_promo_price(self):
         """True if any ingredient is matched to a product currently on a
         promotional/loyalty-card price at some store — used to highlight
-        the recipe (RecipesPage, meal planner cards), not for current_cost
-        or any other cost calculation, which stay on regular prices only.
+        the recipe (RecipesPage, meal planner cards). current_cost already
+        factors the promo price in when it's the cheaper option (see
+        RecipeIngredient.store_costs), so this is purely an informational
+        flag ("some of this total depends on a promo"), not a separate cost.
         """
         return any(
             price_row.promo_price is not None
@@ -133,6 +135,11 @@ class RecipeIngredient(models.Model):
         store across every match (zero if a match has no priced stores, or
         no shared unit to scale by); a product priced at 3 stores
         contributes up to 3 entries.
+
+        Uses each store's effective_price (the promo price when it currently
+        has one, otherwise the regular price) — a recipe's cost should
+        reflect what it actually costs to buy right now, not the shelf price
+        of a product that's on offer.
         """
         costs = []
         for match in self.grocery_matches.all():
@@ -147,9 +154,10 @@ class RecipeIngredient(models.Model):
             if ratio is None:
                 continue
             for price_row in item.store_prices.all():
-                if price_row.price is None:
+                effective_price = price_row.effective_price
+                if effective_price is None:
                     continue
-                costs.append((price_row, (price_row.price * ratio).quantize(Decimal("0.01"))))
+                costs.append((price_row, (effective_price * ratio).quantize(Decimal("0.01"))))
         return costs
 
     @property
