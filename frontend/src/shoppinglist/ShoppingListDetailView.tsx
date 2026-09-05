@@ -618,14 +618,13 @@ export function ShoppingListDetailView({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[30rem_1fr]">
-        {/* Left panel: building the list, rather than looking at it. Sized
-            off the viewport (not the right panel's own height, which grows
-            with however many items are on the list) and sticky, with its
-            own overflow-y-auto — so it stays fully in view and scrolls
-            independently instead of stretching to match, and scrolling
-            away with, the item list beside it. */}
-        <div className="divide-y divide-slate-200 overflow-y-auto border border-slate-200 lg:sticky lg:top-8 lg:h-[calc(100vh-4rem)] lg:self-start">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        {/* Left panel: building the list, rather than looking at it. Its
+            own box with a height set from the viewport (not from the right
+            panel's content) and its own overflow-y-auto — a genuinely
+            separate scrolling panel, not a grid/flex column whose height or
+            scroll position gets tied to the item list beside it. */}
+        <div className="divide-y divide-slate-200 overflow-y-auto border border-slate-200 lg:h-[calc(100vh-4rem)] lg:w-[30rem] lg:shrink-0">
           <AccordionSection
             title="Generate from planned meals"
             isOpen={openSection === 'generate'}
@@ -847,13 +846,16 @@ export function ShoppingListDetailView({
         </div>
 
         {/* Right panel: the list itself, filling whatever width is left
-            next to the left panel. min-w-0 overrides the grid item's default
+            next to the left panel, in its own scrolling box (same viewport-
+            based height as the left panel) rather than the whole page
+            scrolling — that's what let the left panel get dragged along
+            with it before. min-w-0 overrides the flex item's default
             min-width: auto — without it, this column refuses to shrink
             below the item row's intrinsic content width (several
-            fixed-width, non-wrapping controls), which was forcing the whole
-            page to grow a horizontal scrollbar instead of the row content
-            reflowing to fit. */}
-        <div className="min-w-0 w-full space-y-4">
+            fixed-width, non-wrapping controls), which was forcing a
+            horizontal scrollbar instead of the row content reflowing to
+            fit. */}
+        <div className="min-w-0 w-full flex-1 space-y-4 lg:h-[calc(100vh-4rem)] lg:overflow-y-auto">
           {editingName ? (
             <form
               onSubmit={handleRename}
