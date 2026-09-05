@@ -56,6 +56,27 @@ function storeCostPreviews(item: GroceryItem, row: QuantifiedItem): StoreCostPre
   })
 }
 
+// The image of whichever matched product is currently cheapest for this row
+// (across every match and every store either is priced at) — null if there
+// are no matches, or none of them are priced anywhere, or the cheapest one
+// has no image on file.
+function cheapestMatchImage(row: QuantifiedItem, groceryItems: GroceryItem[]): string | null {
+  let best: { item: GroceryItem; cost: number } | null = null
+  for (const match of row.grocery_matches) {
+    const item = groceryItems.find((gi) => gi.id === match.grocery_item)
+    if (!item) continue
+    const cheapestForItem = storeCostPreviews(item, row).reduce<number | null>(
+      (min, cost) => (cost.lineCost == null ? min : min == null ? cost.lineCost : Math.min(min, cost.lineCost)),
+      null,
+    )
+    if (cheapestForItem == null) continue
+    if (!best || cheapestForItem < best.cost) {
+      best = { item, cost: cheapestForItem }
+    }
+  }
+  return best?.item.image_url || null
+}
+
 // For every named row, adds a match for whichever grocery item(s) whose
 // name contains the row's name (case-insensitive) are the closest-sized
 // fit, one per store — see the "Auto-match grocery items" button below.
@@ -194,16 +215,31 @@ export function ItemGroceryMatchesEditor<T extends QuantifiedItem>({
         </button>
       </div>
       <div className="space-y-2">
-        {items.map((row, index) => (
+        {items.map((row, index) => {
+          const cheapestImage = cheapestMatchImage(row, groceryItems)
+          return (
           <div
             key={index}
             className="grid grid-cols-1 gap-3 rounded-md border border-slate-100 p-2 lg:grid-cols-2"
           >
-            {/* Left: this row's own details. Right: what it's matched to —
-                split into two columns (rather than the matches stacked
-                below, indented) so a row's details and its matches line up
-                side by side instead of one on top of the other. */}
-            <div className="flex flex-col gap-2">
+            {/* Left: this row's own details, with the cheapest matched
+                product's photo as a faint background (behind the inputs,
+                which stay opaque so they're still legible) — a quick visual
+                cue of what's actually being bought here. Right: what it's
+                matched to — split into two columns (rather than the
+                matches stacked below, indented) so a row's details and its
+                matches line up side by side instead of one on top of the
+                other. */}
+            <div
+              className="flex flex-col gap-2 rounded-md bg-cover bg-center p-2"
+              style={
+                cheapestImage
+                  ? {
+                      backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.88)), url("${cheapestImage}")`,
+                    }
+                  : undefined
+              }
+            >
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -325,7 +361,8 @@ export function ItemGroceryMatchesEditor<T extends QuantifiedItem>({
               />
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
       <button
         type="button"
