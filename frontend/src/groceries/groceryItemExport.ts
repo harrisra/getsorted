@@ -91,9 +91,21 @@ function toGroceryItemInput(item: unknown, stores: Store[]): GroceryItemInput | 
   }
 
   const storePricesRaw = Array.isArray(item.store_prices) ? item.store_prices : []
-  const store_prices = storePricesRaw
+  let store_prices = storePricesRaw
     .map((entry) => toStorePriceInput(entry, stores))
     .filter((sp): sp is GroceryItemInput['store_prices'][number] => sp !== null)
+
+  // Files exported before store prices moved to their own list (a single
+  // store/price/product_url per item, rather than a store_prices array) —
+  // read those the old way too, as one store price, so a previously
+  // exported backup file can still be re-imported.
+  if (store_prices.length === 0) {
+    const legacy = toStorePriceInput(
+      { store: item.store, price: item.price, product_url: item.product_url },
+      stores,
+    )
+    if (legacy) store_prices = [legacy]
+  }
   if (store_prices.length === 0) return null
 
   const aisle =
