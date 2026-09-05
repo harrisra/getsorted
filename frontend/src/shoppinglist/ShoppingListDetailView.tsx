@@ -354,9 +354,16 @@ export function ShoppingListDetailView({
   // Grocery catalog shown in the "Add from grocery items" panel — one row
   // per item (see cheapestPerItem), free-text search over name/brand/store,
   // same as the main grocery items page (no separate store filter dropdown
-  // there either — typing the store's name does the same job).
+  // there either — typing the store's name does the same job). Stores this
+  // list has excluded are never offered here, even if cheaper — same rule
+  // generate/add-essentials apply — so picking "cheapest" doesn't hand back
+  // a store this list isn't actually buying from. An item priced only at
+  // excluded stores simply doesn't appear.
+  const excludedStoreIds = new Set(list.excluded_stores)
   const trimmedCatalogSearch = catalogSearch.trim().toLowerCase()
-  const catalogResults = cheapestPerItem(groceryItemOptions).filter((option) => {
+  const catalogResults = cheapestPerItem(
+    groceryItemOptions.filter((option) => !excludedStoreIds.has(option.store)),
+  ).filter((option) => {
     if (
       trimmedCatalogSearch &&
       !`${option.name} ${option.brand} ${option.storeName}`.toLowerCase().includes(trimmedCatalogSearch)
