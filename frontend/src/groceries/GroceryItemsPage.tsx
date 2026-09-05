@@ -534,12 +534,6 @@ export function GroceryItemsPage() {
               onClick={(e) => e.stopPropagation()}
               className="flex shrink-0 items-center gap-3"
             >
-              <span
-                className="max-w-[10rem] truncate text-xs text-slate-400"
-                title={item.created_by_email ?? undefined}
-              >
-                {item.created_by_email ?? 'Unknown'}
-              </span>
               {(item.created_by_email == null || item.created_by_email === user?.email) && (
                 <ConfirmDeleteButton
                   label="Remove grocery item"

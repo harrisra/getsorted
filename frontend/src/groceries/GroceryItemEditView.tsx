@@ -23,7 +23,12 @@ export function GroceryItemEditView({
       >
         ← Back to grocery items
       </button>
-      <h1 className="text-xl font-semibold text-slate-800">Edit grocery item</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold text-slate-800">Edit grocery item</h1>
+        <span className="text-xs text-slate-400">
+          Added by {item.created_by_email ?? 'Unknown'}
+        </span>
+      </div>
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <GroceryItemForm
           itemId={item.id}
