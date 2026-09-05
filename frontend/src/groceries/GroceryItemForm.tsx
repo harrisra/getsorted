@@ -8,6 +8,7 @@ import {
   type Store,
   fetchStores,
   populateGroceryItem,
+  refreshGroceryItemPrice,
 } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 
@@ -21,15 +22,21 @@ const EMPTY: GroceryItemInput = {
   milliliters: null,
   price: '',
   product_url: '',
+  trolley_url: '',
   image_url: '',
 }
 
 export function GroceryItemForm({
+  itemId,
   initialValue,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
+  // The item's id, so "Refresh price" can hit /refresh-price/ on it — only
+  // present when editing an already-saved item, not when adding a new one
+  // (there's nothing to refresh until it's been created once).
+  itemId?: string
   initialValue?: GroceryItemInput
   submitLabel: string
   onSubmit: (item: GroceryItemInput) => Promise<void>
@@ -43,6 +50,11 @@ export function GroceryItemForm({
   const [submitting, setSubmitting] = useState(false)
   const [populating, setPopulating] = useState(false)
   const [populateMessage, setPopulateMessage] = useState<{
+    kind: 'error' | 'notice'
+    text: string
+  } | null>(null)
+  const [refreshingPrice, setRefreshingPrice] = useState(false)
+  const [refreshMessage, setRefreshMessage] = useState<{
     kind: 'error' | 'notice'
     text: string
   } | null>(null)
@@ -106,6 +118,33 @@ export function GroceryItemForm({
     }
   }
 
+  async function handleRefreshPrice() {
+    setRefreshMessage(null)
+    if (!itemId) return
+    if (!values.trolley_url.trim()) {
+      setRefreshMessage({ kind: 'error', text: 'Enter a trolley.co.uk URL first.' })
+      return
+    }
+
+    setRefreshingPrice(true)
+    try {
+      const updated = await refreshGroceryItemPrice(itemId, values.trolley_url)
+      set('trolley_url', updated.trolley_url)
+      set('price', updated.price ?? '')
+      setRefreshMessage({ kind: 'notice', text: `Price refreshed: £${updated.price}` })
+    } catch (err) {
+      setRefreshMessage({
+        kind: 'error',
+        text:
+          err instanceof ApiError
+            ? Object.values(err.fieldErrors).flat().join(' ')
+            : 'Could not refresh the price from trolley.co.uk.',
+      })
+    } finally {
+      setRefreshingPrice(false)
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setErrors([])
@@ -162,6 +201,41 @@ export function GroceryItemForm({
               }`}
             >
               {populateMessage.text}
+            </p>
+          )}
+        </div>
+
+        <div className="col-span-2 space-y-1 text-sm">
+          <span className="font-medium text-slate-700">Trolley URL</span>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="https://www.trolley.co.uk/product/…"
+              value={values.trolley_url}
+              onChange={(e) => set('trolley_url', e.target.value)}
+              className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            />
+            {itemId && (
+              <button
+                type="button"
+                onClick={handleRefreshPrice}
+                disabled={refreshingPrice}
+                className="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {refreshingPrice ? 'Refreshing…' : 'Refresh price'}
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400">
+            A trolley.co.uk product page — lets the price be pulled in automatically.
+          </p>
+          {refreshMessage && (
+            <p
+              className={`text-xs ${
+                refreshMessage.kind === 'error' ? 'text-red-600' : 'text-amber-600'
+              }`}
+            >
+              {refreshMessage.text}
             </p>
           )}
         </div>

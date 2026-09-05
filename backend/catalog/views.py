@@ -1,3 +1,4 @@
+import json
 import re
 from urllib.parse import urlparse
 
@@ -9,10 +10,11 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import GroceryItem, Store
+from .models import GroceryItem, Store, is_trolley_url
 from .serializers import (
     GroceryItemSerializer,
     PopulateRequestSerializer,
+    RefreshPriceRequestSerializer,
     ScrapeRequestSerializer,
     StoreSerializer,
 )
@@ -36,6 +38,11 @@ SCRAPE_ALLOWED_EMAIL = "rob.harris@harristribe.co.uk"
 
 SIZE_RE = re.compile(
     r"(\d+(?:\.\d+)?)\s*(kg|g|litres?|l|ml)\b|(\d+)\s*(?:x|pack|pieces?|pcs?)\b", re.IGNORECASE
+)
+
+JSON_LD_RE = re.compile(
+    r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+    re.IGNORECASE | re.DOTALL,
 )
 
 
@@ -292,6 +299,58 @@ def _scrape_sainsburys(url):
     }, None
 
 
+def _scrape_trolley_price(trolley_url):
+    """Fetch the current price shown on a trolley.co.uk product page.
+
+    Unlike the Pepesto/Sainsbury's lookups above, this isn't a name-based
+    search — trolley.co.uk price-compares a specific product across
+    supermarkets and renders the cheapest current price server-side into a
+    schema.org Product/Offer JSON-LD block on every page load (confirmed by
+    hand against https://www.trolley.co.uk/product/tesco-semi-skimmed-milk/MAC224
+    — the price is plain text already in the HTML response, not filled in by
+    a separate client-side API call), so a plain GET plus parsing that block
+    is enough.
+
+    Returns (price, error): exactly one is None. `price` is a decimal
+    string, e.g. "0.85". `error` is a (response_body, http_status) pair
+    ready to hand straight to Response(*error).
+    """
+    if not is_trolley_url(trolley_url):
+        return None, (
+            {"trolley_url": ["Must be a trolley.co.uk product page."]},
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        response = requests.get(trolley_url, headers={"User-Agent": SCRAPE_USER_AGENT}, timeout=15)
+        response.raise_for_status()
+    except requests.RequestException:
+        return None, (
+            {"detail": "Could not reach trolley.co.uk. Try again later."},
+            status.HTTP_502_BAD_GATEWAY,
+        )
+
+    for block in JSON_LD_RE.findall(response.text):
+        try:
+            data = json.loads(block)
+        except ValueError:
+            continue
+        if data.get("@type") != "Product":
+            continue
+        price = _dig(data, "offers", "price")
+        if price is None:
+            continue
+        try:
+            return f"{float(price):.2f}", None
+        except (TypeError, ValueError):
+            continue
+
+    return None, (
+        {"detail": "Could not find a price on that trolley.co.uk page."},
+        status.HTTP_502_BAD_GATEWAY,
+    )
+
+
 def _flatten_errors(errors):
     return "; ".join(
         f"{field}: {', '.join(str(m) for m in messages)}" for field, messages in errors.items()
@@ -326,6 +385,38 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
         if instance.created_by_id is not None and instance.created_by_id != self.request.user.id:
             raise PermissionDenied("Only the account that added this item can delete it.")
         instance.delete()
+
+    @action(detail=True, methods=["post"], url_path="refresh-price")
+    def refresh_price(self, request, pk=None):
+        """Re-fetch this item's price from trolley.co.uk and save it.
+
+        Accepts an optional `trolley_url` in the body so the form can refresh
+        against a URL that's only just been typed in, without requiring a
+        separate save first — when given, it's saved onto the item alongside
+        the refreshed price; otherwise the item's already-stored trolley_url
+        is used.
+
+        Unlike /populate/ and /scrape/, this doesn't call a third-party
+        lookup service on the app's behalf (no Pepesto cost, no bot-block
+        risk) — it's a plain GET of a URL, so it's open to any signed-in
+        user, same as editing the item by hand.
+        """
+        item = self.get_object()
+        serializer = RefreshPriceRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        trolley_url = serializer.validated_data.get("trolley_url") or item.trolley_url
+        if not trolley_url:
+            raise ValidationError({"trolley_url": ["This item has no trolley.co.uk URL set."]})
+
+        price, error = _scrape_trolley_price(trolley_url)
+        if error:
+            body, error_status = error
+            return Response(body, status=error_status)
+
+        item.trolley_url = trolley_url
+        item.price = price
+        item.save(update_fields=["trolley_url", "price", "updated_at"])
+        return Response(GroceryItemSerializer(item, context={"request": request}).data)
 
     @action(detail=False, methods=["post"], url_path="populate")
     def populate(self, request):

@@ -451,6 +451,19 @@ export function GroceryItemsPage() {
                       </a>
                     </>
                   )}
+                  {item.trolley_url && (
+                    <>
+                      {' · '}
+                      <a
+                        href={item.trolley_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        Trolley
+                      </a>
+                    </>
+                  )}
                 </p>
               </div>
             </div>

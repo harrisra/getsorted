@@ -298,6 +298,10 @@ export interface GroceryItem {
   milliliters: number | null
   price: string | null
   product_url: string
+  // A trolley.co.uk product page for this item, e.g.
+  // https://www.trolley.co.uk/product/tesco-semi-skimmed-milk/MAC224 — optional,
+  // and only used to refresh `price` (see refreshGroceryItemPrice below).
+  trolley_url: string
   image_url: string
   created_by_email: string | null
   created_at: string
@@ -340,6 +344,23 @@ export async function updateGroceryItem(
 
 export async function deleteGroceryItem(id: string): Promise<void> {
   await apiFetch(`/api/catalog/grocery-items/${id}/`, { method: 'DELETE' })
+}
+
+// Re-fetches the item's price from trolley.co.uk and saves it — only
+// possible for an already-saved item (it's a detail action). `trolleyUrl`
+// is optional: pass the form's current (possibly unsaved) value so this can
+// be used right after typing a new URL in, without saving first — the
+// server saves it onto the item alongside the refreshed price. Omit it to
+// reuse whatever trolley_url the item already has stored.
+export async function refreshGroceryItemPrice(
+  id: string,
+  trolleyUrl?: string,
+): Promise<GroceryItem> {
+  const response = await apiFetch(`/api/catalog/grocery-items/${id}/refresh-price/`, {
+    method: 'POST',
+    body: JSON.stringify({ trolley_url: trolleyUrl || '' }),
+  })
+  return response.json()
 }
 
 export interface PopulateResult {

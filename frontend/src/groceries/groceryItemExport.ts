@@ -14,6 +14,7 @@ export interface ExportedGroceryItem {
   milliliters: number | null
   price: string | null
   product_url: string
+  trolley_url: string
   image_url: string
 }
 
@@ -28,6 +29,7 @@ function toExportedGroceryItem(item: GroceryItem): ExportedGroceryItem {
     milliliters: item.milliliters,
     price: item.price,
     product_url: item.product_url,
+    trolley_url: item.trolley_url,
     image_url: item.image_url,
   }
 }
@@ -86,6 +88,7 @@ function toGroceryItemInput(item: unknown, stores: Store[]): GroceryItemInput | 
     milliliters: typeof item.milliliters === 'number' ? item.milliliters : null,
     price: typeof item.price === 'string' ? item.price : null,
     product_url: typeof item.product_url === 'string' ? item.product_url : '',
+    trolley_url: typeof item.trolley_url === 'string' ? item.trolley_url : '',
     image_url: typeof item.image_url === 'string' ? item.image_url : '',
   }
 }

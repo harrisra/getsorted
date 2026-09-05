@@ -26,6 +26,7 @@ export function GroceryItemEditView({
       <h1 className="text-xl font-semibold text-slate-800">Edit grocery item</h1>
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <GroceryItemForm
+          itemId={item.id}
           submitLabel="Save"
           initialValue={{
             store: item.store,
@@ -37,6 +38,7 @@ export function GroceryItemEditView({
             milliliters: item.milliliters,
             price: item.price,
             product_url: item.product_url,
+            trolley_url: item.trolley_url,
             image_url: item.image_url,
           }}
           onCancel={onCancel}

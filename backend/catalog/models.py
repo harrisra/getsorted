@@ -1,7 +1,19 @@
 import uuid
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.db import models
+
+
+def is_trolley_url(url):
+    """True if `url` is a trolley.co.uk page — the only host
+    GroceryItem.trolley_url should ever hold. It gets fetched directly
+    server-side to refresh a price (see catalog.views._scrape_trolley_price),
+    and URLField alone doesn't restrict which host is allowed, so this is
+    checked both when the field is written (GroceryItemSerializer) and again
+    right before it's fetched, as defense in depth against an arbitrary URL
+    ending up there and the server being made to issue requests to it."""
+    return (urlparse(url).hostname or "").removeprefix("www.") == "trolley.co.uk"
 
 
 class Store(models.Model):
@@ -64,6 +76,12 @@ class GroceryItem(models.Model):
     milliliters = models.PositiveIntegerField(null=True, blank=True)
     price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     product_url = models.URLField(blank=True)
+    # A trolley.co.uk product page for this item, e.g.
+    # https://www.trolley.co.uk/product/tesco-semi-skimmed-milk/MAC224 — optional,
+    # since not every item has one, but when set it lets the price be refreshed
+    # straight from trolley.co.uk's own price-comparison page (see
+    # GroceryItemViewSet.refresh_price).
+    trolley_url = models.URLField(blank=True)
     image_url = models.URLField(blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True

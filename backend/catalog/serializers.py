@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import GroceryItem, Store
+from .models import GroceryItem, Store, is_trolley_url
 
 
 class StoreSerializer(serializers.ModelSerializer):
@@ -33,6 +33,7 @@ class GroceryItemSerializer(serializers.ModelSerializer):
             "milliliters",
             "price",
             "product_url",
+            "trolley_url",
             "image_url",
             "created_by_email",
             "created_at",
@@ -51,6 +52,11 @@ class GroceryItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Provide grams, pieces, and/or milliliters.")
         return attrs
 
+    def validate_trolley_url(self, value):
+        if value and not is_trolley_url(value):
+            raise serializers.ValidationError("Must be a trolley.co.uk product page URL.")
+        return value
+
 
 class PopulateRequestSerializer(serializers.Serializer):
     name = serializers.CharField(
@@ -61,3 +67,10 @@ class PopulateRequestSerializer(serializers.Serializer):
 
 class ScrapeRequestSerializer(serializers.Serializer):
     urls = serializers.CharField(help_text="One product URL per line.")
+
+
+class RefreshPriceRequestSerializer(serializers.Serializer):
+    # Optional: lets the caller refresh against a trolley_url that's only
+    # sitting in an unsaved edit (see GroceryItemViewSet.refresh_price) —
+    # falls back to the item's already-stored trolley_url when omitted.
+    trolley_url = serializers.URLField(required=False, allow_blank=True)
