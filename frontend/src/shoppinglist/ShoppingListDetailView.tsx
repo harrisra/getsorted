@@ -49,6 +49,32 @@ function matchingGroceryItemOptions(
   return sortByPrice(options.filter((option) => option.name.toLowerCase().includes(needle)))
 }
 
+// One row per grocery item — whichever store it's currently cheapest at
+// (promo price preferred, same effective-price idea used throughout the
+// app) — instead of one row per store price, which repeated the same
+// product once for every store it happened to be priced at. Used for the
+// "Add from grocery items" catalog list, where picking any one row already
+// means "add this product" rather than comparing its own stores against
+// each other (that comparison is what the per-item ingredient/shopping-list
+// dropdowns are for).
+function cheapestPerItem(options: GroceryItemStorePriceOption[]): GroceryItemStorePriceOption[] {
+  const bestByItem = new Map<string, GroceryItemStorePriceOption>()
+  for (const option of options) {
+    const current = bestByItem.get(option.groceryItemId)
+    if (!current) {
+      bestByItem.set(option.groceryItemId, option)
+      continue
+    }
+    const currentPrice = current.promo_price ?? current.price
+    const optionPrice = option.promo_price ?? option.price
+    const better =
+      (currentPrice == null && optionPrice != null) ||
+      (currentPrice != null && optionPrice != null && Number(optionPrice) < Number(currentPrice))
+    if (better) bestByItem.set(option.groceryItemId, option)
+  }
+  return Array.from(bestByItem.values())
+}
+
 // The raw amount needed, e.g. "500g" or "2pc + 300ml" — used as a fallback
 // when there's no matched grocery item to express the amount as a pack
 // count instead.
@@ -325,12 +351,12 @@ export function ShoppingListDetailView({
     ? sortEnriched(enrichItems(visibleItems, groceryItemOptions), sortMode)
     : null
 
-  // Grocery catalog (item, store) prices shown in the "Add from grocery
-  // items" panel — free-text search over name/brand/store, same as the
-  // main grocery items page (no separate store filter dropdown there
-  // either — typing the store's name does the same job).
+  // Grocery catalog shown in the "Add from grocery items" panel — one row
+  // per item (see cheapestPerItem), free-text search over name/brand/store,
+  // same as the main grocery items page (no separate store filter dropdown
+  // there either — typing the store's name does the same job).
   const trimmedCatalogSearch = catalogSearch.trim().toLowerCase()
-  const catalogResults = groceryItemOptions.filter((option) => {
+  const catalogResults = cheapestPerItem(groceryItemOptions).filter((option) => {
     if (
       trimmedCatalogSearch &&
       !`${option.name} ${option.brand} ${option.storeName}`.toLowerCase().includes(trimmedCatalogSearch)
