@@ -25,7 +25,6 @@ export type NavTab =
   | 'shoppinglist'
 
 const TABS: { id: NavTab; label: string; icon: typeof UserIcon }[] = [
-  { id: 'account', label: 'Account', icon: UserIcon },
   { id: 'household', label: 'Household', icon: HomeIcon },
   { id: 'groceries', label: 'Groceries', icon: BasketIcon },
   { id: 'recipes', label: 'Recipes', icon: BookIcon },
@@ -127,6 +126,17 @@ export function Sidebar({
       </nav>
 
       <div className="space-y-1 border-t border-slate-200 px-2 py-3">
+        <button
+          type="button"
+          title={collapsed ? 'Account' : undefined}
+          onClick={() => onSelectTab('account')}
+          className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition ${
+            activeTab === 'account' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'
+          } ${collapsed ? 'justify-center' : ''}`}
+        >
+          <UserIcon className="h-5 w-5 shrink-0" />
+          {!collapsed && <span>Account</span>}
+        </button>
         <button
           type="button"
           title={collapsed ? 'Logout' : undefined}
