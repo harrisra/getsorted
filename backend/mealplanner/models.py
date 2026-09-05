@@ -88,7 +88,57 @@ class Recipe(models.Model):
         )
 
 
-class RecipeIngredient(models.Model):
+class QuantityMatchMixin:
+    """Shared by anything shaped like "a name plus an amount needed
+    (grams/pieces/milliliters) plus zero or more grocery-catalog product
+    matches" — currently RecipeIngredient and EssentialsItem. Requires the
+    including model to define `grams`, `pieces`, `milliliters`, and a
+    `grocery_matches` related manager of rows exposing `.grocery_item`.
+    """
+
+    @property
+    def store_costs(self):
+        """(GroceryItemPrice, cost) pairs derived from every matched grocery
+        item's current store prices, scaled to the amount needed by whichever
+        unit (grams/milliliters/pieces) this row and that item share — e.g.
+        needing 250g of a 500g, £2 pack costs £1. One entry per priced store
+        across every match (zero if a match has no priced stores, or no
+        shared unit to scale by); a product priced at 3 stores contributes
+        up to 3 entries.
+
+        Uses each store's effective_price (the promo price when it currently
+        has one, otherwise the regular price) — cost should reflect what it
+        actually costs to buy right now, not the shelf price of a product
+        that's on offer.
+        """
+        costs = []
+        for match in self.grocery_matches.all():
+            item = match.grocery_item
+            ratio = None
+            for dimension in ("grams", "milliliters", "pieces"):
+                item_amount = getattr(item, dimension)
+                own_amount = getattr(self, dimension)
+                if item_amount and own_amount is not None:
+                    ratio = Decimal(own_amount) / Decimal(item_amount)
+                    break
+            if ratio is None:
+                continue
+            for price_row in item.store_prices.all():
+                effective_price = price_row.effective_price
+                if effective_price is None:
+                    continue
+                costs.append((price_row, (effective_price * ratio).quantize(Decimal("0.01"))))
+        return costs
+
+    @property
+    def line_cost(self):
+        """The cheapest cost across every store any matched grocery item is
+        currently priced at. None if there are no priced matches."""
+        costs = [cost for _, cost in self.store_costs]
+        return min(costs) if costs else None
+
+
+class RecipeIngredient(QuantityMatchMixin, models.Model):
     """One ingredient line within a Recipe.
 
     Optionally matched to one or more catalog GroceryItems via
@@ -97,8 +147,9 @@ class RecipeIngredient(models.Model):
     Tesco and an Aldi cheddar) without needing a separate match per store.
     Which store ends up "the" match for cost purposes isn't chosen — it's
     computed from whichever stores each matched product currently has a
-    price at (see store_costs/line_cost below), so a store starting or
-    stopping stocking a matched product is reflected automatically.
+    price at (see QuantityMatchMixin.store_costs/line_cost), so a store
+    starting or stopping stocking a matched product is reflected
+    automatically.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -126,47 +177,6 @@ class RecipeIngredient(models.Model):
         )
         return f"{amount} {self.name}".strip()
 
-    @property
-    def store_costs(self):
-        """(GroceryItemPrice, cost) pairs derived from every matched grocery
-        item's current store prices, scaled to the amount needed by whichever
-        unit (grams/milliliters/pieces) the ingredient and that item share —
-        e.g. needing 250g of a 500g, £2 pack costs £1. One entry per priced
-        store across every match (zero if a match has no priced stores, or
-        no shared unit to scale by); a product priced at 3 stores
-        contributes up to 3 entries.
-
-        Uses each store's effective_price (the promo price when it currently
-        has one, otherwise the regular price) — a recipe's cost should
-        reflect what it actually costs to buy right now, not the shelf price
-        of a product that's on offer.
-        """
-        costs = []
-        for match in self.grocery_matches.all():
-            item = match.grocery_item
-            ratio = None
-            for dimension in ("grams", "milliliters", "pieces"):
-                item_amount = getattr(item, dimension)
-                ingredient_amount = getattr(self, dimension)
-                if item_amount and ingredient_amount is not None:
-                    ratio = Decimal(ingredient_amount) / Decimal(item_amount)
-                    break
-            if ratio is None:
-                continue
-            for price_row in item.store_prices.all():
-                effective_price = price_row.effective_price
-                if effective_price is None:
-                    continue
-                costs.append((price_row, (effective_price * ratio).quantize(Decimal("0.01"))))
-        return costs
-
-    @property
-    def line_cost(self):
-        """The cheapest cost across every store any matched grocery item is
-        currently priced at. None if there are no priced matches."""
-        costs = [cost for _, cost in self.store_costs]
-        return min(costs) if costs else None
-
 
 class RecipeIngredientGroceryItem(models.Model):
     """One grocery-catalog product this RecipeIngredient can be bought as.
@@ -188,6 +198,87 @@ class RecipeIngredientGroceryItem(models.Model):
 
     def __str__(self):
         return f"{self.recipe_ingredient.name}: {self.grocery_item.name}"
+
+
+class Essentials(models.Model):
+    """A named, recurring grocery-item grouping that isn't tied to any
+    particular meal — e.g. "Soft drinks", "Snacks", "Toiletries": the
+    household's regular weekly buys. Added to a shopping list the same way a
+    recipe's ingredients are (see ShoppingListViewSet.add_essentials), just
+    on demand rather than for specific planned days.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    household = models.ForeignKey(Household, on_delete=models.CASCADE, related_name="essentials")
+    name = models.CharField(max_length=255)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name_plural = "essentials"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def current_cost(self):
+        """Sum of each item's cheapest matched option — same "best price
+        achievable buying each item wherever it's individually cheapest"
+        idea as Recipe.current_cost. None (rather than 0) when nothing is
+        priced."""
+        prices = [item.line_cost for item in self.items.all() if item.line_cost is not None]
+        return sum(prices) if prices else None
+
+
+class EssentialsItem(QuantityMatchMixin, models.Model):
+    """One line within an Essentials group — shaped identically to
+    RecipeIngredient (see QuantityMatchMixin for the shared cost math), just
+    attached to an Essentials group instead of a Recipe."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    essentials = models.ForeignKey(Essentials, on_delete=models.CASCADE, related_name="items")
+    name = models.CharField(max_length=255)
+    grams = models.PositiveIntegerField(null=True, blank=True)
+    pieces = models.PositiveIntegerField(null=True, blank=True)
+    milliliters = models.PositiveIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        amount = " ".join(
+            part
+            for part in [
+                f"{self.grams}g" if self.grams else "",
+                f"{self.pieces}pc" if self.pieces else "",
+                f"{self.milliliters}ml" if self.milliliters else "",
+            ]
+            if part
+        )
+        return f"{amount} {self.name}".strip()
+
+
+class EssentialsItemGroceryItem(models.Model):
+    """One grocery-catalog product this EssentialsItem can be bought as —
+    the EssentialsItem/Essentials equivalent of RecipeIngredientGroceryItem."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    essentials_item = models.ForeignKey(
+        EssentialsItem, on_delete=models.CASCADE, related_name="grocery_matches"
+    )
+    grocery_item = models.ForeignKey(
+        "catalog.GroceryItem", on_delete=models.CASCADE, related_name="essentials_item_matches"
+    )
+
+    class Meta:
+        unique_together = ("essentials_item", "grocery_item")
+
+    def __str__(self):
+        return f"{self.essentials_item.name}: {self.grocery_item.name}"
 
 
 class MealPlan(models.Model):

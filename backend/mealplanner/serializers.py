@@ -5,6 +5,9 @@ from rest_framework.reverse import reverse
 
 from catalog.models import GroceryItem, GroceryItemPrice
 from .models import (
+    Essentials,
+    EssentialsItem,
+    EssentialsItemGroceryItem,
     MealPlan,
     MealSlot,
     Recipe,
@@ -215,6 +218,131 @@ class RecipeSummarySerializer(RecipeImageMixin, serializers.ModelSerializer):
     def get_current_cost(self, recipe):
         cost = recipe.current_cost
         return str(cost) if cost is not None else None
+
+
+class EssentialsItemGroceryItemSerializer(serializers.ModelSerializer):
+    # Mirrors RecipeIngredientGroceryItemSerializer exactly (see there for
+    # the rationale) — the two only differ in which quantity object a
+    # match belongs to (essentials_item vs recipe_ingredient).
+    grocery_item_detail = GroceryItemSummarySerializer(source="grocery_item", read_only=True)
+    store_costs = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EssentialsItemGroceryItem
+        fields = ["id", "grocery_item", "grocery_item_detail", "store_costs"]
+        read_only_fields = ["id"]
+
+    def get_store_costs(self, match):
+        item = match.grocery_item
+        essentials_item = match.essentials_item
+        ratio = None
+        for dimension in ("grams", "milliliters", "pieces"):
+            item_amount = getattr(item, dimension)
+            own_amount = getattr(essentials_item, dimension)
+            if item_amount and own_amount is not None:
+                ratio = Decimal(own_amount) / Decimal(item_amount)
+                break
+
+        results = []
+        for price_row in item.store_prices.all():
+            cost = None
+            effective_price = price_row.effective_price
+            if ratio is not None and effective_price is not None:
+                cost = (effective_price * ratio).quantize(Decimal("0.01"))
+            results.append(
+                {
+                    "store": price_row.store_id,
+                    "store_name": price_row.store.name,
+                    "price": str(price_row.price) if price_row.price is not None else None,
+                    "line_cost": str(cost) if cost is not None else None,
+                    "promo_price": str(price_row.promo_price) if price_row.promo_price is not None else None,
+                }
+            )
+        return results
+
+
+class EssentialsItemSerializer(serializers.ModelSerializer):
+    grocery_matches = EssentialsItemGroceryItemSerializer(many=True, required=False)
+    line_cost = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EssentialsItem
+        fields = ["id", "name", "grams", "pieces", "milliliters", "grocery_matches", "line_cost"]
+
+    def get_line_cost(self, item):
+        cost = item.line_cost
+        return str(cost) if cost is not None else None
+
+    def validate(self, attrs):
+        def value(field):
+            return attrs.get(field, getattr(self.instance, field, None) if self.instance else None)
+
+        if value("grams") is None and value("pieces") is None and value("milliliters") is None:
+            raise serializers.ValidationError("Provide grams, pieces, and/or milliliters.")
+
+        grocery_matches = attrs.get("grocery_matches")
+        if grocery_matches:
+            item_ids = [match["grocery_item"].id for match in grocery_matches]
+            if len(item_ids) != len(set(item_ids)):
+                raise serializers.ValidationError(
+                    {"grocery_matches": "The same grocery item can only be matched once."}
+                )
+        return attrs
+
+
+class EssentialsSerializer(serializers.ModelSerializer):
+    items = EssentialsItemSerializer(many=True, required=False)
+    current_cost = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Essentials
+        fields = [
+            "id",
+            "household",
+            "name",
+            "items",
+            "current_cost",
+            "created_by",
+            "created_at",
+        ]
+        read_only_fields = ["created_by", "created_at"]
+
+    def get_current_cost(self, essentials):
+        cost = essentials.current_cost
+        return str(cost) if cost is not None else None
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items", [])
+        essentials = super().create(validated_data)
+        self._set_items(essentials, items_data)
+        return essentials
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop("items", None)
+        essentials = super().update(instance, validated_data)
+        if items_data is not None:
+            essentials.items.all().delete()
+            self._set_items(essentials, items_data)
+        return essentials
+
+    def _set_items(self, essentials, items_data):
+        items = []
+        matches = []
+        for data in items_data:
+            matches_data = data.pop("grocery_matches", [])
+            item = EssentialsItem(essentials=essentials, **data)
+            items.append(item)
+            for match in matches_data:
+                matches.append(
+                    EssentialsItemGroceryItem(
+                        essentials_item=item,
+                        grocery_item=match["grocery_item"],
+                    )
+                )
+        # Items first — the matches' FK needs their (UUID, so already
+        # client-side generated) ids to already exist as rows.
+        EssentialsItem.objects.bulk_create(items)
+        EssentialsItemGroceryItem.objects.bulk_create(matches)
 
 
 class MealSlotSerializer(serializers.ModelSerializer):

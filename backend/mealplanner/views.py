@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from accounts.models import Household, Membership
 from .models import (
     MAX_RECIPE_IMAGE_MB,
+    Essentials,
     MealPlan,
     MealSlot,
     MealType,
@@ -24,6 +25,7 @@ from .models import (
 )
 from .permissions import IsHouseholdMember
 from .serializers import (
+    EssentialsSerializer,
     MealPlanSerializer,
     MealSlotSerializer,
     RecipeSerializer,
@@ -106,6 +108,25 @@ class RecipeViewSet(HouseholdScopedViewSet):
         recipe.image_content_type = content_type
         recipe.save(update_fields=["image_data", "image_content_type"])
         return Response(self.get_serializer(recipe).data)
+
+
+class EssentialsViewSet(HouseholdScopedViewSet):
+    """A household's recurring, non-meal grocery groupings (see
+    mealplanner.Essentials) — any household member can view/edit/delete,
+    same as ShoppingList/MealPlan rather than Recipe's creator-restricted
+    delete, since there's no "who cooked this" ownership angle here."""
+
+    queryset = Essentials.objects.prefetch_related(
+        "items",
+        "items__grocery_matches",
+        "items__grocery_matches__grocery_item",
+        "items__grocery_matches__grocery_item__store_prices",
+        "items__grocery_matches__grocery_item__store_prices__store",
+    )
+    serializer_class = EssentialsSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
 
 
 class MealPlanViewSet(HouseholdScopedViewSet):
@@ -212,6 +233,70 @@ def add_or_merge_shopping_list_item(
     return item, True
 
 
+def add_grouped_items_to_shopping_list(shopping_list, entries, excluded_store_ids, user):
+    """Add every (item, meal_plan_id) pair in `entries` to shopping_list, one
+    line per distinct name — shared by ShoppingListViewSet.generate (sourced
+    from planned recipes) and .add_essentials (sourced from an Essentials
+    group). `item` is anything shaped like RecipeIngredient/EssentialsItem
+    (see models.QuantityMatchMixin): `.name`, `.grams`, `.pieces`,
+    `.milliliters`, `.store_costs`.
+
+    Amounts across every entry sharing a name (case/whitespace-insensitive)
+    are summed together, and the resulting line's match defaults to
+    whichever non-excluded store is cheapest across all of them — same rule
+    reoptimize_item_stores applies for an already-generated item. Returns
+    the affected ShoppingListItems.
+    """
+    groups = {}
+    for item, meal_plan_id in entries:
+        key = item.name.strip().lower()
+        groups.setdefault(key, []).append((item, meal_plan_id))
+
+    affected = []
+    for group_entries in groups.values():
+        display_name = group_entries[0][0].name.strip()
+        grams = sum(i.grams or 0 for i, _ in group_entries) or None
+        pieces = sum(i.pieces or 0 for i, _ in group_entries) or None
+        milliliters = sum(i.milliliters or 0 for i, _ in group_entries) or None
+        # Only link a single originating meal_plan when every occurrence of
+        # this name came from the same one — otherwise leave it unlinked
+        # rather than pointing at an arbitrary one of several (an Essentials
+        # item always passes meal_plan_id=None, so a name shared between a
+        # recipe and an Essentials group also ends up unlinked here).
+        meal_plan_ids = {mp_id for _, mp_id in group_entries}
+        meal_plan_id = meal_plan_ids.pop() if len(meal_plan_ids) == 1 else None
+
+        # Default the matched product+store to whichever is cheapest across
+        # every item contributing to this line — so a generated item shows
+        # a cost straight away instead of only after the user re-picks a
+        # product from the dropdown. Only ever set on create; merging into
+        # an existing item never touches its match (see
+        # add_or_merge_shopping_list_item). Stores this list has excluded
+        # are never picked here, even if cheaper.
+        priced_options = [
+            (price_row, cost)
+            for i, _ in group_entries
+            for price_row, cost in i.store_costs
+            if price_row.store_id not in excluded_store_ids
+        ]
+        grocery_item_price = (
+            min(priced_options, key=lambda pair: pair[1])[0] if priced_options else None
+        )
+
+        item, _created = add_or_merge_shopping_list_item(
+            shopping_list,
+            display_name,
+            grams,
+            pieces,
+            milliliters,
+            meal_plan_id,
+            user,
+            grocery_item_price=grocery_item_price,
+        )
+        affected.append(item)
+    return affected
+
+
 class ShoppingListViewSet(HouseholdScopedViewSet):
     """A household can have several shopping lists going at once (e.g.
     "This week", "Costco run")."""
@@ -253,57 +338,53 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
         # this set for an already-generated item whose stores change later.
         excluded_store_ids = set(shopping_list.excluded_stores.values_list("id", flat=True))
 
-        # Normalized ingredient name -> [(ingredient, meal_plan_id), ...]
-        groups = {}
-        for slot in slots:
-            for recipe in slot.recipes.all():
-                for ingredient in recipe.ingredients.all():
-                    key = ingredient.name.strip().lower()
-                    groups.setdefault(key, []).append((ingredient, slot.meal_plan_id))
+        entries = [
+            (ingredient, slot.meal_plan_id)
+            for slot in slots
+            for recipe in slot.recipes.all()
+            for ingredient in recipe.ingredients.all()
+        ]
+        affected = add_grouped_items_to_shopping_list(
+            shopping_list, entries, excluded_store_ids, request.user
+        )
 
-        affected = []
-        for entries in groups.values():
-            display_name = entries[0][0].name.strip()
-            grams = sum(ing.grams or 0 for ing, _ in entries) or None
-            pieces = sum(ing.pieces or 0 for ing, _ in entries) or None
-            milliliters = sum(ing.milliliters or 0 for ing, _ in entries) or None
-            # Only link a single originating meal_plan when every occurrence
-            # of this ingredient came from the same one — otherwise leave it
-            # unlinked rather than pointing at an arbitrary one of several.
-            meal_plan_ids = {mp_id for _, mp_id in entries}
-            meal_plan_id = meal_plan_ids.pop() if len(meal_plan_ids) == 1 else None
+        serializer = ShoppingListItemSerializer(affected, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-            # Default the matched product+store to whichever is cheapest
-            # across every ingredient contributing to this line — the same
-            # computation already used for the recipe's own cost calculation
-            # (see RecipeIngredient.store_costs/line_cost) — so a generated
-            # item shows a cost straight away instead of only after the user
-            # re-picks a product from the dropdown. Only ever set on create;
-            # merging into an existing item never touches its match (see
-            # add_or_merge_shopping_list_item). Stores this list has excluded
-            # are never picked here, even if cheaper — same rule
-            # reoptimize_item_stores already applies for an existing item.
-            priced_options = [
-                (price_row, cost)
-                for ingredient, _ in entries
-                for price_row, cost in ingredient.store_costs
-                if price_row.store_id not in excluded_store_ids
-            ]
-            grocery_item_price = (
-                min(priced_options, key=lambda pair: pair[1])[0] if priced_options else None
+    @action(detail=True, methods=["post"], url_path="add-essentials")
+    def add_essentials(self, request, pk=None):
+        """Add items to this list from one or more of the household's
+        Essentials groups (see mealplanner.Essentials) — same merge-by-name
+        and cheapest-non-excluded-store defaulting as generate, just sourced
+        from a standing Essentials group instead of a dated meal plan (so
+        there's no meal_plan to link a resulting item to).
+        """
+        shopping_list = self.get_object()
+        essentials_ids = request.data.get("essentials_ids")
+        if not isinstance(essentials_ids, list) or not essentials_ids:
+            raise ValidationError(
+                {"essentials_ids": ["A non-empty list of essentials ids is required."]}
             )
 
-            item, _created = add_or_merge_shopping_list_item(
-                shopping_list,
-                display_name,
-                grams,
-                pieces,
-                milliliters,
-                meal_plan_id,
-                request.user,
-                grocery_item_price=grocery_item_price,
+        essentials_qs = Essentials.objects.filter(
+            household=shopping_list.household, id__in=essentials_ids
+        ).prefetch_related(
+            "items__grocery_matches__grocery_item__store_prices__store",
+        )
+        found_ids = {str(e.id) for e in essentials_qs}
+        missing = [str(i) for i in essentials_ids if str(i) not in found_ids]
+        if missing:
+            raise ValidationError(
+                {"essentials_ids": [f"Not found in this household: {', '.join(missing)}."]}
             )
-            affected.append(item)
+
+        excluded_store_ids = set(shopping_list.excluded_stores.values_list("id", flat=True))
+        entries = [
+            (item, None) for essentials in essentials_qs for item in essentials.items.all()
+        ]
+        affected = add_grouped_items_to_shopping_list(
+            shopping_list, entries, excluded_store_ids, request.user
+        )
 
         serializer = ShoppingListItemSerializer(affected, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)

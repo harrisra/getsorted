@@ -11,6 +11,7 @@ import {
   ChevronsRightIcon,
   HomeIcon,
   LogoutIcon,
+  RepeatIcon,
   UserIcon,
 } from '../icons'
 
@@ -21,6 +22,7 @@ export type NavTab =
   | 'household'
   | 'groceries'
   | 'recipes'
+  | 'essentials'
   | 'mealplanner'
   | 'shoppinglist'
 
@@ -28,12 +30,13 @@ const TABS: { id: NavTab; label: string; icon: typeof UserIcon }[] = [
   { id: 'household', label: 'Household', icon: HomeIcon },
   { id: 'groceries', label: 'Groceries', icon: BasketIcon },
   { id: 'recipes', label: 'Recipes', icon: BookIcon },
+  { id: 'essentials', label: 'Essentials', icon: RepeatIcon },
   { id: 'mealplanner', label: 'Meal Planner', icon: CalendarIcon },
   { id: 'shoppinglist', label: 'Shopping Lists', icon: ChecklistIcon },
 ]
 
 // Meaningless without a household to scope them to.
-const HOUSEHOLD_SCOPED_TABS: NavTab[] = ['recipes', 'mealplanner', 'shoppinglist']
+const HOUSEHOLD_SCOPED_TABS: NavTab[] = ['recipes', 'essentials', 'mealplanner', 'shoppinglist']
 
 function loadInitialCollapsed(): boolean {
   const stored = localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)

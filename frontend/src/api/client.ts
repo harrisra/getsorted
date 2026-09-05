@@ -606,6 +606,76 @@ export async function deleteRecipeImage(id: string): Promise<void> {
   await apiFetch(`/api/mealplanner/recipes/${id}/image/`, { method: 'DELETE' })
 }
 
+// A household's recurring, non-meal grocery groupings — e.g. "Soft drinks",
+// "Snacks", "Toiletries" — shaped just like a Recipe's ingredients (same
+// grocery-match/cost machinery, see RecipeIngredient above) but without any
+// of the meal-specific fields (meal_type/servings/instructions/image),
+// since an Essentials group isn't a meal.
+export type EssentialsItemGroceryItemInput = { grocery_item: string }
+
+export interface EssentialsItemGroceryItem {
+  id: string
+  grocery_item: string
+  grocery_item_detail: GroceryItemSummary
+  store_costs: GroceryMatchStoreCost[]
+}
+
+export interface EssentialsItem {
+  id: string
+  name: string
+  grams: number | null
+  pieces: number | null
+  milliliters: number | null
+  grocery_matches: EssentialsItemGroceryItem[]
+  line_cost: string | null
+}
+
+export type EssentialsItemInput = Omit<EssentialsItem, 'id' | 'grocery_matches' | 'line_cost'> & {
+  grocery_matches: EssentialsItemGroceryItemInput[]
+}
+
+export interface Essentials {
+  id: string
+  household: string
+  name: string
+  items: EssentialsItem[]
+  current_cost: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export type EssentialsInput = Omit<
+  Essentials,
+  'id' | 'current_cost' | 'created_by' | 'created_at' | 'items'
+> & {
+  items: EssentialsItemInput[]
+}
+
+export async function fetchEssentials(): Promise<Essentials[]> {
+  const response = await apiFetch('/api/mealplanner/essentials/')
+  return response.json()
+}
+
+export async function createEssentials(essentials: EssentialsInput): Promise<Essentials> {
+  const response = await apiFetch('/api/mealplanner/essentials/', {
+    method: 'POST',
+    body: JSON.stringify(essentials),
+  })
+  return response.json()
+}
+
+export async function updateEssentials(id: string, essentials: EssentialsInput): Promise<Essentials> {
+  const response = await apiFetch(`/api/mealplanner/essentials/${id}/`, {
+    method: 'PUT',
+    body: JSON.stringify(essentials),
+  })
+  return response.json()
+}
+
+export async function deleteEssentials(id: string): Promise<void> {
+  await apiFetch(`/api/mealplanner/essentials/${id}/`, { method: 'DELETE' })
+}
+
 export interface RecipeSummary {
   id: string
   name: string
@@ -732,6 +802,24 @@ export async function generateShoppingList(
     method: 'POST',
     body: JSON.stringify({ dates }),
   })
+  return response.json()
+}
+
+// Adds items from one or more of the household's Essentials groups to this
+// list — same merge-by-name and cheapest-non-excluded-store defaulting as
+// generateShoppingList, just sourced from a standing Essentials group
+// instead of a dated meal plan.
+export async function addEssentialsToShoppingList(
+  shoppingListId: string,
+  essentialsIds: string[],
+): Promise<ShoppingListItem[]> {
+  const response = await apiFetch(
+    `/api/mealplanner/shopping-lists/${shoppingListId}/add-essentials/`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ essentials_ids: essentialsIds }),
+    },
+  )
   return response.json()
 }
 

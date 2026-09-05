@@ -1,6 +1,8 @@
 from django.contrib import admin
 
 from .models import (
+    Essentials,
+    EssentialsItem,
     MealPlan,
     MealSlot,
     Recipe,
@@ -17,6 +19,11 @@ class MealSlotInline(admin.TabularInline):
 
 class RecipeIngredientInline(admin.TabularInline):
     model = RecipeIngredient
+    extra = 1
+
+
+class EssentialsItemInline(admin.TabularInline):
+    model = EssentialsItem
     extra = 1
 
 
@@ -38,6 +45,14 @@ class RecipeAdmin(admin.ModelAdmin):
     list_filter = ["household", "meal_type"]
     search_fields = ["name"]
     inlines = [RecipeIngredientInline]
+
+
+@admin.register(Essentials)
+class EssentialsAdmin(admin.ModelAdmin):
+    list_display = ["name", "household", "created_by"]
+    list_filter = ["household"]
+    search_fields = ["name"]
+    inlines = [EssentialsItemInline]
 
 
 @admin.register(ShoppingList)

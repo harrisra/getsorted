@@ -90,6 +90,19 @@ export function BookIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+// A repeating/recurring-purchase symbol — used for Essentials, which is
+// about the household's standing weekly buys rather than a one-off list.
+export function RepeatIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M17 2.5 20 5.5l-3 3" />
+      <path d="M20 5.5H8a5 5 0 0 0-5 5v1" />
+      <path d="M7 21.5 4 18.5l3-3" />
+      <path d="M4 18.5h12a5 5 0 0 0 5-5v-1" />
+    </Icon>
+  )
+}
+
 export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>

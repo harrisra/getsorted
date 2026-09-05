@@ -3,6 +3,7 @@ import { API_BASE_URL } from './api/client'
 import { AccountPage } from './account/AccountPage'
 import { AuthPage } from './auth/AuthPage'
 import { useAuth } from './auth/AuthContext'
+import { EssentialsPage } from './essentials/EssentialsPage'
 import { GroceryItemsPage } from './groceries/GroceryItemsPage'
 import { HouseholdPage } from './households/HouseholdPage'
 import { HouseholdsProvider, useHouseholds } from './households/HouseholdsContext'
@@ -36,13 +37,16 @@ function Dashboard() {
   const [activeTab, setActiveTab] = useState<NavTab>(currentHousehold ? 'account' : 'household')
   const status = useHealthStatus()
 
-  // Recipes/Meal Planner/Shopping List need a household — if the one in
-  // view gets deleted while a household-scoped tab is active, fall back to
-  // Household instead of rendering a page with nothing to show.
+  // Recipes/Essentials/Meal Planner/Shopping List need a household — if the
+  // one in view gets deleted while a household-scoped tab is active, fall
+  // back to Household instead of rendering a page with nothing to show.
   useEffect(() => {
     if (
       !currentHousehold &&
-      (activeTab === 'recipes' || activeTab === 'mealplanner' || activeTab === 'shoppinglist')
+      (activeTab === 'recipes' ||
+        activeTab === 'essentials' ||
+        activeTab === 'mealplanner' ||
+        activeTab === 'shoppinglist')
     ) {
       setActiveTab('household')
     }
@@ -57,6 +61,7 @@ function Dashboard() {
           {activeTab === 'household' && <HouseholdPage />}
           {activeTab === 'groceries' && <GroceryItemsPage />}
           {activeTab === 'recipes' && currentHousehold && <RecipesPage />}
+          {activeTab === 'essentials' && currentHousehold && <EssentialsPage />}
           {activeTab === 'mealplanner' && currentHousehold && <MealPlannerPage />}
           {activeTab === 'shoppinglist' && currentHousehold && <ShoppingListsPage />}
         </main>
