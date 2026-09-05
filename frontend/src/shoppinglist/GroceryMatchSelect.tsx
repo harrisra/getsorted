@@ -110,9 +110,15 @@ export function GroceryMatchSelect({
         )}
       </button>
       {open && (
+        // right-0 (not the default left-aligned) — this trigger usually sits
+        // well to the right within its row, and the row's own list container
+        // clips overflow-x for its rounded corners, so a panel that instead
+        // grew rightward from the trigger's left edge was getting clipped
+        // there. Anchoring to the trigger's right edge keeps it growing back
+        // over the row instead, comfortably inside that container.
         <ul
           role="listbox"
-          className="absolute z-10 mt-1 max-h-56 w-max max-w-[28rem] overflow-auto rounded-md border border-slate-200 bg-white shadow-lg"
+          className="absolute right-0 z-10 mt-1 max-h-56 w-max max-w-[24rem] overflow-auto rounded-md border border-slate-200 bg-white shadow-lg"
         >
           {options.map((option) => (
             <li key={option.id} role="option" aria-selected={option.id === value}>
