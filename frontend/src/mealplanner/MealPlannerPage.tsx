@@ -274,7 +274,11 @@ export function MealPlannerPage() {
         )}
       </div>
 
-      <DragOverlay>
+      {/* No drop animation: the actual move only lands in state once
+          handleMoveRecipe's API calls resolve, so animating the overlay back
+          to the (still-old) source position on every drop — even a valid
+          one — looked like the meal flying back to where it started. */}
+      <DragOverlay dropAnimation={null}>
         {activeRecipe && <RecipeCardContent recipe={activeRecipe} className="shadow-lg" />}
       </DragOverlay>
     </DndContext>
