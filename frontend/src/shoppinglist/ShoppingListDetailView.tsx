@@ -112,9 +112,21 @@ function optionRowBackground(option: GroceryItemStorePriceOption, cheapest: numb
 }
 
 // Cost of buying enough packs of the matched product to cover this row —
-// packs_needed times the pack price. Null unless both are known (i.e. a
-// grocery item is actually matched and priced).
+// packs_needed times the pack price. Uses the promo price when the matched
+// product currently has one at this store, same as everywhere else in the
+// app now prefers effectivePrice over the regular shelf price. Null unless
+// both are known (i.e. a grocery item is actually matched and priced).
 function rowCost(item: ShoppingListItem): number | null {
+  const detail = item.grocery_item_price_detail
+  if (item.packs_needed == null || !detail) return null
+  const price = detail.promo_price ?? detail.price
+  return price != null ? Number(price) * item.packs_needed : null
+}
+
+// The same row's cost ignoring any promo — always the regular shelf price —
+// used only for the "without promos" total, so that total reflects what the
+// list would cost without relying on any current offer.
+function rowCostWithoutPromo(item: ShoppingListItem): number | null {
   const price = item.grocery_item_price_detail?.price
   if (item.packs_needed == null || price == null) return null
   return Number(price) * item.packs_needed
@@ -281,8 +293,13 @@ export function ShoppingListDetailView({
   const visibleItems = items?.filter((item) => item.shopping_list === list.id) ?? null
   // Sum of every row's cost that's actually known (matched product with a
   // price) — items with no match/no price simply don't contribute, rather
-  // than treating "unknown" as £0.
+  // than treating "unknown" as £0. totalCost uses each row's promo price
+  // when it has one; totalCostWithoutPromo is the same list at regular
+  // shelf prices only, shown alongside so it's clear how much of the total
+  // depends on current offers.
   const totalCost = visibleItems?.reduce((sum, item) => sum + (rowCost(item) ?? 0), 0) ?? 0
+  const totalCostWithoutPromo =
+    visibleItems?.reduce((sum, item) => sum + (rowCostWithoutPromo(item) ?? 0), 0) ?? 0
   const sortedItems = visibleItems
     ? sortEnriched(enrichItems(visibleItems, groceryItemOptions), sortMode)
     : null
@@ -941,9 +958,12 @@ export function ShoppingListDetailView({
           </ul>
 
           {visibleItems !== null && visibleItems.length > 0 && (
-            <p className="text-right text-sm font-semibold text-slate-800">
-              Total: £{totalCost.toFixed(2)}
-            </p>
+            <div className="text-right text-sm">
+              <p className="font-semibold text-slate-800">Total: £{totalCost.toFixed(2)}</p>
+              <p className="text-slate-500">
+                Without promos: £{totalCostWithoutPromo.toFixed(2)}
+              </p>
+            </div>
           )}
         </div>
       </div>
