@@ -240,11 +240,16 @@ function AccordionSection({
   isOpen,
   onToggle,
   children,
+  // Overridable so a section whose own content should reach the panel's
+  // edges (e.g. Groceries — see below) isn't stuck with this default
+  // padding/spacing.
+  contentClassName = 'space-y-3 p-4',
 }: {
   title: string
   isOpen: boolean
   onToggle: () => void
   children: ReactNode
+  contentClassName?: string
 }) {
   return (
     // flex-1 (and min-h-0, so it can actually shrink and scroll internally
@@ -268,7 +273,9 @@ function AccordionSection({
         />
       </button>
       {isOpen && (
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-white p-4">{children}</div>
+        <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto bg-white ${contentClassName}`}>
+          {children}
+        </div>
       )}
     </div>
   )
@@ -760,6 +767,12 @@ export function ShoppingListDetailView({
             title="Groceries"
             isOpen={openSection === 'catalog'}
             onToggle={() => toggleSection('catalog')}
+            // No padding — the search box and list reach the panel's own
+            // edges — and the list is flex-1 (see below) rather than
+            // capped at max-h-72, so it uses whatever vertical space this
+            // section has instead of stopping short and leaving blank
+            // space underneath.
+            contentClassName="space-y-2"
           >
             <input
               type="search"
@@ -771,7 +784,7 @@ export function ShoppingListDetailView({
             />
             {catalogAddError && <p className="text-sm text-red-600">{catalogAddError}</p>}
 
-            <ul className="max-h-72 divide-y divide-slate-200 overflow-y-auto rounded-md border border-slate-200">
+            <ul className="min-h-0 flex-1 divide-y divide-slate-200 overflow-y-auto rounded-md border border-slate-200">
               {catalogResults.length === 0 && (
                 <li className="px-3 py-3 text-sm text-slate-400">
                   {trimmedCatalogSearch ? 'No grocery items match.' : 'Search for a grocery item to add it.'}
