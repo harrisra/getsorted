@@ -430,16 +430,38 @@ export interface GroceryItemRef {
   price: string | null
 }
 
-export interface RecipeIngredientStoreOption {
+// The matched product itself, just enough to display/search it — each
+// store's price for it is reported separately (see GroceryMatchStoreCost),
+// since a product can be priced at several stores at once.
+export interface GroceryItemSummary {
   id: string
-  /** The store this match is for (derived server-side from grocery_item_price). */
+  name: string
+  brand: string
+  image_url: string
+  grams: number | null
+  pieces: number | null
+  milliliters: number | null
+}
+
+// One store's current price for a matched product, scaled to this
+// ingredient's amount needed — computed server-side (not stored), so a
+// store starting/stopping stocking it is reflected automatically.
+export interface GroceryMatchStoreCost {
   store: string
-  grocery_item_price: string
-  grocery_item_price_detail: GroceryItemRef
+  store_name: string
+  price: string | null
   line_cost: string | null
 }
 
-export type RecipeIngredientStoreOptionInput = { grocery_item_price: string }
+export interface RecipeIngredientGroceryItem {
+  id: string
+  grocery_item: string
+  grocery_item_detail: GroceryItemSummary
+  /** This match's cost at every store its product is currently priced at. */
+  store_costs: GroceryMatchStoreCost[]
+}
+
+export type RecipeIngredientGroceryItemInput = { grocery_item: string }
 
 export interface RecipeIngredient {
   id: string
@@ -447,17 +469,19 @@ export interface RecipeIngredient {
   grams: number | null
   pieces: number | null
   milliliters: number | null
-  /** At most one match per store — see RecipeIngredientStoreOption. */
-  store_options: RecipeIngredientStoreOption[]
-  /** The cheapest of store_options' line costs. */
+  /** One or more matched catalog products — see RecipeIngredientGroceryItem.
+   * At most one match per product; several products can be matched at once
+   * (e.g. both a Tesco and an Aldi cheddar). */
+  grocery_matches: RecipeIngredientGroceryItem[]
+  /** The cheapest cost across every store any matched product is priced at. */
   line_cost: string | null
 }
 
 export type RecipeIngredientInput = Omit<
   RecipeIngredient,
-  'id' | 'store_options' | 'line_cost'
+  'id' | 'grocery_matches' | 'line_cost'
 > & {
-  store_options: RecipeIngredientStoreOptionInput[]
+  grocery_matches: RecipeIngredientGroceryItemInput[]
 }
 
 export interface Recipe {

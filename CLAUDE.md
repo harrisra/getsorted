@@ -86,9 +86,16 @@ entries, but only the account that created an entry (`created_by`) can delete it
 A `GroceryItem` is the product itself (name/brand/aisle/size/image/`trolley_url`) —
 it can be priced at several stores at once, each as its own `GroceryItemPrice` row
 (store, price, that store's own `product_url`), rather than needing a duplicate
-`GroceryItem` per store. `RecipeIngredientStoreOption` and `ShoppingListItem` match
-against a specific `GroceryItemPrice` (i.e. a specific store's price for a
-product), not the `GroceryItem` directly, since "which store" now lives there.
+`GroceryItem` per store. A recipe ingredient (`mealplanner.RecipeIngredientGroceryItem`)
+matches against the `GroceryItem` itself, not a specific store's price — an
+ingredient can match several products at once (e.g. both a Tesco and an Aldi
+cheddar), and which store ends up used for cost purposes isn't chosen, it's
+computed (`RecipeIngredient.store_costs`/`line_cost`) from whichever stores each
+matched product is *currently* priced at, so a store starting/stopping stocking
+one is reflected automatically without re-picking a match. `ShoppingListItem`, by
+contrast, still matches a specific `GroceryItemPrice` — buying is a concrete
+"this product, at this store" decision, unlike an ingredient's open-ended list of
+acceptable products.
 
 It also has one action that fetches product data on the user's behalf:
 `/api/catalog/grocery-items/{id}/refresh-price/` re-fetches prices from the item's

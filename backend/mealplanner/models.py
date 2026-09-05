@@ -54,8 +54,9 @@ class Recipe(models.Model):
         the amount needed.
 
         "Cheapest matched option" rather than any one fixed store, since an
-        ingredient can now be matched to a different GroceryItem per store
-        (see RecipeIngredientStoreOption) — this is the best price achievable
+        ingredient can be matched to several GroceryItems at once, each
+        potentially priced at several stores (see RecipeIngredientGroceryItem,
+        RecipeIngredient.store_costs) — this is the best price achievable
         buying each ingredient wherever it's individually cheapest, not
         necessarily all from one shop. None (rather than 0) when nothing is
         priced, so "no data" isn't confused with "free". Shared by
@@ -73,10 +74,14 @@ class Recipe(models.Model):
 class RecipeIngredient(models.Model):
     """One ingredient line within a Recipe.
 
-    Optionally matched to catalog GroceryItems via RecipeIngredientStoreOption
-    — at most one match per store, so the same ingredient can be priced
-    against every store a household shops at (e.g. cheddar cheese at both
-    Tesco and Aldi) to compare totals.
+    Optionally matched to one or more catalog GroceryItems via
+    RecipeIngredientGroceryItem — a product match, not a per-store one, so
+    the same ingredient can match several products at once (e.g. both a
+    Tesco and an Aldi cheddar) without needing a separate match per store.
+    Which store ends up "the" match for cost purposes isn't chosen — it's
+    computed from whichever stores each matched product currently has a
+    price at (see store_costs/line_cost below), so a store starting or
+    stopping stocking a matched product is reflected automatically.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -105,65 +110,61 @@ class RecipeIngredient(models.Model):
         return f"{amount} {self.name}".strip()
 
     @property
+    def store_costs(self):
+        """(GroceryItemPrice, cost) pairs derived from every matched grocery
+        item's current store prices, scaled to the amount needed by whichever
+        unit (grams/milliliters/pieces) the ingredient and that item share —
+        e.g. needing 250g of a 500g, £2 pack costs £1. One entry per priced
+        store across every match (zero if a match has no priced stores, or
+        no shared unit to scale by); a product priced at 3 stores
+        contributes up to 3 entries.
+        """
+        costs = []
+        for match in self.grocery_matches.all():
+            item = match.grocery_item
+            ratio = None
+            for dimension in ("grams", "milliliters", "pieces"):
+                item_amount = getattr(item, dimension)
+                ingredient_amount = getattr(self, dimension)
+                if item_amount and ingredient_amount is not None:
+                    ratio = Decimal(ingredient_amount) / Decimal(item_amount)
+                    break
+            if ratio is None:
+                continue
+            for price_row in item.store_prices.all():
+                if price_row.price is None:
+                    continue
+                costs.append((price_row, (price_row.price * ratio).quantize(Decimal("0.01"))))
+        return costs
+
+    @property
     def line_cost(self):
-        """The cheapest of this ingredient's matched store options, scaled
-        to the amount needed. None if there are no priced matches."""
-        costs = [
-            option.line_cost for option in self.store_options.all() if option.line_cost is not None
-        ]
+        """The cheapest cost across every store any matched grocery item is
+        currently priced at. None if there are no priced matches."""
+        costs = [cost for _, cost in self.store_costs]
         return min(costs) if costs else None
 
 
-class RecipeIngredientStoreOption(models.Model):
-    """One (ingredient, store) match: this RecipeIngredient can be bought as
-    the linked GroceryItemPrice's product, at that price row's store. At most
-    one match per store per ingredient — enforced by unique_together on
-    `store`, which is denormalized from grocery_item_price.store purely to
-    get a real DB constraint (kept in sync in save()); a store, not a
-    product, is what's unique per ingredient, since a GroceryItem can now be
-    priced at several stores at once (see catalog.GroceryItemPrice).
+class RecipeIngredientGroceryItem(models.Model):
+    """One grocery-catalog product this RecipeIngredient can be bought as.
+    At most one match per product per ingredient (matching the same product
+    twice would be redundant); several different products can each be
+    matched at once (see RecipeIngredient's docstring).
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     recipe_ingredient = models.ForeignKey(
-        RecipeIngredient, on_delete=models.CASCADE, related_name="store_options"
+        RecipeIngredient, on_delete=models.CASCADE, related_name="grocery_matches"
     )
-    grocery_item_price = models.ForeignKey(
-        "catalog.GroceryItemPrice", on_delete=models.CASCADE, related_name="recipe_ingredient_options"
+    grocery_item = models.ForeignKey(
+        "catalog.GroceryItem", on_delete=models.CASCADE, related_name="recipe_ingredient_matches"
     )
-    store = models.ForeignKey("catalog.Store", on_delete=models.CASCADE, editable=False)
 
     class Meta:
-        unique_together = ("recipe_ingredient", "store")
-
-    def save(self, *args, **kwargs):
-        self.store_id = self.grocery_item_price.store_id
-        super().save(*args, **kwargs)
+        unique_together = ("recipe_ingredient", "grocery_item")
 
     def __str__(self):
-        return f"{self.recipe_ingredient.name} @ {self.store.name}: {self.grocery_item_price.grocery_item.name}"
-
-    @property
-    def line_cost(self):
-        """This match's share of the store price's cost, scaled by whichever
-        unit (grams/milliliters/pieces) both the ingredient and the item
-        have in common — e.g. needing 250g of a 500g, £2 pack costs £1.
-        None if there's no price, or no shared unit to scale by (rather
-        than guessing, or falling back to the item's full price, which
-        would silently overstate the cost).
-        """
-        price_row = self.grocery_item_price
-        item = price_row.grocery_item
-        ingredient = self.recipe_ingredient
-        if price_row.price is None:
-            return None
-        for dimension in ("grams", "milliliters", "pieces"):
-            item_amount = getattr(item, dimension)
-            ingredient_amount = getattr(ingredient, dimension)
-            if item_amount and ingredient_amount is not None:
-                cost = price_row.price * (Decimal(ingredient_amount) / Decimal(item_amount))
-                return cost.quantize(Decimal("0.01"))
-        return None
+        return f"{self.recipe_ingredient.name}: {self.grocery_item.name}"
 
 
 class MealPlan(models.Model):

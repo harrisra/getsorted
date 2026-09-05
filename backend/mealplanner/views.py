@@ -45,10 +45,10 @@ class HouseholdScopedViewSet(viewsets.ModelViewSet):
 class RecipeViewSet(HouseholdScopedViewSet):
     queryset = Recipe.objects.prefetch_related(
         "ingredients",
-        "ingredients__store_options",
-        "ingredients__store_options__grocery_item_price",
-        "ingredients__store_options__grocery_item_price__store",
-        "ingredients__store_options__grocery_item_price__grocery_item",
+        "ingredients__grocery_matches",
+        "ingredients__grocery_matches__grocery_item",
+        "ingredients__grocery_matches__grocery_item__store_prices",
+        "ingredients__grocery_matches__grocery_item__store_prices__store",
     ).all()
     serializer_class = RecipeSerializer
 
@@ -113,8 +113,10 @@ class MealPlanViewSet(HouseholdScopedViewSet):
         "slots",
         "slots__recipes",
         "slots__recipes__ingredients",
-        "slots__recipes__ingredients__store_options",
-        "slots__recipes__ingredients__store_options__grocery_item_price",
+        "slots__recipes__ingredients__grocery_matches",
+        "slots__recipes__ingredients__grocery_matches__grocery_item",
+        "slots__recipes__ingredients__grocery_matches__grocery_item__store_prices",
+        "slots__recipes__ingredients__grocery_matches__grocery_item__store_prices__store",
     )
     serializer_class = MealPlanSerializer
 
@@ -162,8 +164,10 @@ class MealSlotViewSet(HouseholdScopedViewSet):
     queryset = MealSlot.objects.prefetch_related(
         "recipes",
         "recipes__ingredients",
-        "recipes__ingredients__store_options",
-        "recipes__ingredients__store_options__grocery_item_price",
+        "recipes__ingredients__grocery_matches",
+        "recipes__ingredients__grocery_matches__grocery_item",
+        "recipes__ingredients__grocery_matches__grocery_item__store_prices",
+        "recipes__ingredients__grocery_matches__grocery_item__store_prices__store",
     )
     serializer_class = MealSlotSerializer
     household_lookup = "meal_plan__household__members"
@@ -241,7 +245,7 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
         slots = MealSlot.objects.filter(
             meal_plan__household=shopping_list.household, date__in=parsed_dates
         ).prefetch_related(
-            "recipes__ingredients__store_options__grocery_item_price",
+            "recipes__ingredients__grocery_matches__grocery_item__store_prices__store",
         )
 
         # Normalized ingredient name -> [(ingredient, meal_plan_id), ...]
@@ -264,24 +268,21 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
             meal_plan_ids = {mp_id for _, mp_id in entries}
             meal_plan_id = meal_plan_ids.pop() if len(meal_plan_ids) == 1 else None
 
-            # Default the matched product to whichever store option is
-            # cheapest across every ingredient contributing to this line —
-            # the same match already used for the recipe's own cost
-            # calculation (see RecipeIngredient.line_cost) — so a generated
+            # Default the matched product+store to whichever is cheapest
+            # across every ingredient contributing to this line — the same
+            # computation already used for the recipe's own cost calculation
+            # (see RecipeIngredient.store_costs/line_cost) — so a generated
             # item shows a cost straight away instead of only after the user
             # re-picks a product from the dropdown. Only ever set on create;
             # merging into an existing item never touches its match (see
             # add_or_merge_shopping_list_item).
             priced_options = [
-                option
+                (price_row, cost)
                 for ingredient, _ in entries
-                for option in ingredient.store_options.all()
-                if option.line_cost is not None
+                for price_row, cost in ingredient.store_costs
             ]
             grocery_item_price = (
-                min(priced_options, key=lambda option: option.line_cost).grocery_item_price
-                if priced_options
-                else None
+                min(priced_options, key=lambda pair: pair[1])[0] if priced_options else None
             )
 
             item, _created = add_or_merge_shopping_list_item(

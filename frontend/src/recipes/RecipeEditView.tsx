@@ -45,8 +45,8 @@ export function RecipeEditView({
               grams: ing.grams,
               pieces: ing.pieces,
               milliliters: ing.milliliters,
-              store_options: ing.store_options.map((opt) => ({
-                grocery_item_price: opt.grocery_item_price,
+              grocery_matches: ing.grocery_matches.map((match) => ({
+                grocery_item: match.grocery_item,
               })),
             })),
           }}

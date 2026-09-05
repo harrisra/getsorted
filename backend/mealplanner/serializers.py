@@ -1,24 +1,25 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from catalog.models import GroceryItemPrice
+from catalog.models import GroceryItem, GroceryItemPrice
 from .models import (
     MealPlan,
     MealSlot,
     Recipe,
     RecipeIngredient,
-    RecipeIngredientStoreOption,
+    RecipeIngredientGroceryItem,
     ShoppingList,
     ShoppingListItem,
 )
 
 
 class GroceryItemPriceSummarySerializer(serializers.ModelSerializer):
-    # Read-only here (nested under a RecipeIngredientStoreOption/
-    # ShoppingListItem), so just the store's name rather than the FK id, and
-    # the product's own name/image rather than needing a second round trip
-    # to the catalog — GroceryItemCombobox displays/searches them as plain
-    # text.
+    # Read-only here (nested under a ShoppingListItem), so just the store's
+    # name rather than the FK id, and the product's own name/image rather
+    # than needing a second round trip to the catalog — GroceryItemCombobox
+    # displays/searches them as plain text.
     store = serializers.CharField(source="store.name", read_only=True)
     name = serializers.CharField(source="grocery_item.name", read_only=True)
     image_url = serializers.CharField(source="grocery_item.image_url", read_only=True)
@@ -28,27 +29,66 @@ class GroceryItemPriceSummarySerializer(serializers.ModelSerializer):
         fields = ["id", "store", "name", "image_url", "price"]
 
 
-class RecipeIngredientStoreOptionSerializer(serializers.ModelSerializer):
-    grocery_item_price_detail = GroceryItemPriceSummarySerializer(
-        source="grocery_item_price", read_only=True
-    )
-    line_cost = serializers.SerializerMethodField()
+class GroceryItemSummarySerializer(serializers.ModelSerializer):
+    """The matched product itself — just enough for GroceryItemCombobox to
+    display/search it (name/brand/size/image). Each store's price for it is
+    reported separately (see RecipeIngredientGroceryItemSerializer.store_costs)
+    since a product can be priced at several stores at once."""
 
     class Meta:
-        model = RecipeIngredientStoreOption
-        fields = ["id", "store", "grocery_item_price", "grocery_item_price_detail", "line_cost"]
-        read_only_fields = ["id", "store"]
+        model = GroceryItem
+        fields = ["id", "name", "brand", "image_url", "grams", "pieces", "milliliters"]
 
-    def get_line_cost(self, option):
-        cost = option.line_cost
-        return str(cost) if cost is not None else None
+
+class RecipeIngredientGroceryItemSerializer(serializers.ModelSerializer):
+    grocery_item_detail = GroceryItemSummarySerializer(source="grocery_item", read_only=True)
+    store_costs = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RecipeIngredientGroceryItem
+        fields = ["id", "grocery_item", "grocery_item_detail", "store_costs"]
+        read_only_fields = ["id"]
+
+    def get_store_costs(self, match):
+        """This match's product, scaled to the ingredient's amount needed,
+        at every store it's currently priced at — computed here rather than
+        stored, so a store starting/stopping stocking it is reflected
+        automatically rather than needing the match re-picked. One entry per
+        priced store; each entry's line_cost is None if there's no shared
+        unit (grams/milliliters/pieces) to scale by.
+        """
+        item = match.grocery_item
+        ingredient = match.recipe_ingredient
+        ratio = None
+        for dimension in ("grams", "milliliters", "pieces"):
+            item_amount = getattr(item, dimension)
+            ingredient_amount = getattr(ingredient, dimension)
+            if item_amount and ingredient_amount is not None:
+                ratio = Decimal(ingredient_amount) / Decimal(item_amount)
+                break
+
+        results = []
+        for price_row in item.store_prices.all():
+            cost = None
+            if ratio is not None and price_row.price is not None:
+                cost = (price_row.price * ratio).quantize(Decimal("0.01"))
+            results.append(
+                {
+                    "store": price_row.store_id,
+                    "store_name": price_row.store.name,
+                    "price": str(price_row.price) if price_row.price is not None else None,
+                    "line_cost": str(cost) if cost is not None else None,
+                }
+            )
+        return results
 
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
-    # One match per store — see RecipeIngredientStoreOption. Written as raw
-    # dicts by RecipeSerializer._set_ingredients rather than through this
-    # nested serializer's own create/update, same as `ingredients` itself.
-    store_options = RecipeIngredientStoreOptionSerializer(many=True, required=False)
+    # Matches to one or more catalog products — see
+    # RecipeIngredientGroceryItem. Written as raw dicts by
+    # RecipeSerializer._set_ingredients rather than through this nested
+    # serializer's own create/update, same as `ingredients` itself.
+    grocery_matches = RecipeIngredientGroceryItemSerializer(many=True, required=False)
     line_cost = serializers.SerializerMethodField()
 
     class Meta:
@@ -59,7 +99,7 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
             "grams",
             "pieces",
             "milliliters",
-            "store_options",
+            "grocery_matches",
             "line_cost",
         ]
 
@@ -74,12 +114,12 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
         if value("grams") is None and value("pieces") is None and value("milliliters") is None:
             raise serializers.ValidationError("Provide grams, pieces, and/or milliliters.")
 
-        store_options = attrs.get("store_options")
-        if store_options:
-            store_ids = [opt["grocery_item_price"].store_id for opt in store_options]
-            if len(store_ids) != len(set(store_ids)):
+        grocery_matches = attrs.get("grocery_matches")
+        if grocery_matches:
+            item_ids = [match["grocery_item"].id for match in grocery_matches]
+            if len(item_ids) != len(set(item_ids)):
                 raise serializers.ValidationError(
-                    {"store_options": "Only one grocery item match is allowed per store."}
+                    {"grocery_matches": "The same grocery item can only be matched once."}
                 )
         return attrs
 
@@ -137,24 +177,22 @@ class RecipeSerializer(RecipeImageMixin, serializers.ModelSerializer):
 
     def _set_ingredients(self, recipe, ingredients_data):
         ingredients = []
-        options = []
+        matches = []
         for data in ingredients_data:
-            store_options_data = data.pop("store_options", [])
+            matches_data = data.pop("grocery_matches", [])
             ingredient = RecipeIngredient(recipe=recipe, **data)
             ingredients.append(ingredient)
-            for opt in store_options_data:
-                grocery_item_price = opt["grocery_item_price"]
-                options.append(
-                    RecipeIngredientStoreOption(
+            for match in matches_data:
+                matches.append(
+                    RecipeIngredientGroceryItem(
                         recipe_ingredient=ingredient,
-                        grocery_item_price=grocery_item_price,
-                        store_id=grocery_item_price.store_id,
+                        grocery_item=match["grocery_item"],
                     )
                 )
-        # Ingredients first — the options' FK needs their (UUID, so already
+        # Ingredients first — the matches' FK needs their (UUID, so already
         # client-side generated) ids to already exist as rows.
         RecipeIngredient.objects.bulk_create(ingredients)
-        RecipeIngredientStoreOption.objects.bulk_create(options)
+        RecipeIngredientGroceryItem.objects.bulk_create(matches)
 
 
 class RecipeSummarySerializer(RecipeImageMixin, serializers.ModelSerializer):

@@ -86,10 +86,10 @@ function toRecipeInput(item: unknown, householdId: string): RecipeInput | null {
       grams: typeof ing.grams === 'number' ? ing.grams : null,
       pieces: typeof ing.pieces === 'number' ? ing.pieces : null,
       milliliters: typeof ing.milliliters === 'number' ? ing.milliliters : null,
-      // Store matches are intentionally ignored on import, even if a file
+      // Grocery matches are intentionally ignored on import, even if a file
       // happens to include some (e.g. a hand-edited export) — they're
       // catalog-specific and wouldn't make sense re-imported elsewhere.
-      store_options: [],
+      grocery_matches: [],
     })),
   }
 }

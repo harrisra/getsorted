@@ -89,11 +89,10 @@ class GroceryItemSerializer(serializers.ModelSerializer):
 
     def _sync_store_prices(self, item, store_prices_data):
         """Update existing rows in place and add/remove as needed, rather
-        than always deleting and recreating every row on every save — other
-        rows (RecipeIngredientStoreOption, ShoppingListItem) reference a
-        GroceryItemPrice by id, so recreating them on every edit would
-        silently break every such match each time this item's form is
-        saved.
+        than always deleting and recreating every row on every save — a
+        ShoppingListItem references a GroceryItemPrice by id, so recreating
+        them on every edit would silently break every such match each time
+        this item's form is saved.
         """
         existing_by_store = {price.store_id: price for price in item.store_prices.all()}
         seen_store_ids = set()
