@@ -159,28 +159,76 @@ export function RecipeForm({
     return groceryItems.filter((item) => !matchedIds.has(item.id))
   }
 
-  // For every named ingredient, adds a match for each grocery item whose
-  // name contains the ingredient's name (case-insensitive) — e.g. an
+  // For every named ingredient, adds a match for whichever grocery item(s)
+  // whose name contains the ingredient's name (case-insensitive) — e.g. an
   // ingredient named "Mature Cheddar" picks up "Cathedral City Extra Mature
-  // Cheddar Cheese 550 g". A simple substring test rather than anything
-  // fancier, same spirit as the exact-match rule used for export/import.
-  // Only adds matches, never removes any already made by hand.
+  // Cheddar Cheese 550 g" — are the closest-sized fit, one per store.
+  //
+  // Name alone can match several pack sizes of the same product (a 200g and
+  // a 500g pack, say); rather than adding all of them and leaving it unclear
+  // which is really "the" price at a store both happen to be sold at, this
+  // picks, for each store any candidate is priced at, only the candidate
+  // whose grams/pieces/milliliters is closest to what the ingredient needs.
+  // A candidate with no store prices at all can still be the only thing
+  // found for an ingredient, so the single closest-sized one of those is
+  // kept too. Only adds matches, never removes any already made by hand.
   function autoMatchIngredientsByName() {
     set(
       'ingredients',
       values.ingredients.map((ingredient) => {
         const needle = ingredient.name.trim().toLowerCase()
         if (!needle) return ingredient
+
+        let dimension: 'grams' | 'milliliters' | 'pieces' | null = null
+        let ingredientAmount: number | null = null
+        for (const d of ['grams', 'milliliters', 'pieces'] as const) {
+          if (ingredient[d] != null) {
+            dimension = d
+            ingredientAmount = ingredient[d]
+            break
+          }
+        }
+        if (dimension === null || ingredientAmount === null) return ingredient
+
         const matchedIds = new Set(ingredient.grocery_matches.map((match) => match.grocery_item))
-        const found = groceryItems.filter(
-          (item) => !matchedIds.has(item.id) && item.name.toLowerCase().includes(needle),
+        const candidates = groceryItems.filter(
+          (item) =>
+            !matchedIds.has(item.id) &&
+            item.name.toLowerCase().includes(needle) &&
+            item[dimension as 'grams' | 'milliliters' | 'pieces'] != null,
         )
-        if (found.length === 0) return ingredient
+        if (candidates.length === 0) return ingredient
+
+        const sizeDiff = (item: GroceryItem) =>
+          Math.abs(item[dimension as 'grams' | 'milliliters' | 'pieces']! - (ingredientAmount as number))
+
+        const found = new Map<string, GroceryItem>()
+        const bestPerStore = new Map<string, { item: GroceryItem; diff: number }>()
+        for (const item of candidates) {
+          const diff = sizeDiff(item)
+          for (const storePrice of item.store_prices) {
+            const current = bestPerStore.get(storePrice.store)
+            if (!current || diff < current.diff) {
+              bestPerStore.set(storePrice.store, { item, diff })
+            }
+          }
+        }
+        for (const { item } of bestPerStore.values()) found.set(item.id, item)
+
+        const unpriced = candidates.filter((item) => item.store_prices.length === 0)
+        if (unpriced.length > 0) {
+          const closestUnpriced = unpriced.reduce((best, item) =>
+            sizeDiff(item) < sizeDiff(best) ? item : best,
+          )
+          found.set(closestUnpriced.id, closestUnpriced)
+        }
+
+        if (found.size === 0) return ingredient
         return {
           ...ingredient,
           grocery_matches: [
             ...ingredient.grocery_matches,
-            ...found.map((item) => ({ grocery_item: item.id })),
+            ...Array.from(found.values()).map((item) => ({ grocery_item: item.id })),
           ],
         }
       }),
@@ -363,7 +411,7 @@ export function RecipeForm({
           <button
             type="button"
             onClick={autoMatchIngredientsByName}
-            title="Add a grocery match for every product whose name contains an ingredient's name"
+            title="Match each ingredient to whichever product(s) with a matching name are the closest size, one per store"
             className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
           >
             Auto-match grocery items
