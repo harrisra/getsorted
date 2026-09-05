@@ -9,14 +9,22 @@ import {
 } from '../api/client'
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { useHouseholds } from '../households/HouseholdsContext'
+import { formatFullDate } from '../mealplanner/dates'
 import { ShoppingListDetailView } from './ShoppingListDetailView'
+
+// Defaults a new list's name to today's date (e.g. "Saturday 5th September")
+// — ready to use as-is for "this week's shop" without typing anything,
+// while still just a normal editable text field if something else fits.
+function defaultListName(): string {
+  return formatFullDate(new Date())
+}
 
 export function ShoppingListsPage() {
   const { currentHousehold } = useHouseholds()
   const [lists, setLists] = useState<ShoppingList[] | null>(null)
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
-  const [newListName, setNewListName] = useState('')
+  const [newListName, setNewListName] = useState(defaultListName)
   const [creating, setCreating] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
@@ -89,7 +97,10 @@ export function ShoppingListsPage() {
         {!showAddForm && (
           <button
             type="button"
-            onClick={() => setShowAddForm(true)}
+            onClick={() => {
+              setNewListName(defaultListName())
+              setShowAddForm(true)
+            }}
             className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
           >
             New list

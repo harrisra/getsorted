@@ -48,3 +48,42 @@ export function formatDayHeading(iso: string): string {
   const weekday = WEEKDAY_LABELS[pythonWeekday(date)].slice(0, 3)
   return `${weekday} ${date.getDate()}/${date.getMonth() + 1}`
 }
+
+const MONTH_LABELS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
+
+// "5th", "1st", "22nd" — the 11th/12th/13th are always "th" even though
+// their last digit (1/2/3) would otherwise suggest st/nd/rd.
+function ordinal(day: number): string {
+  if (day >= 11 && day <= 13) return `${day}th`
+  switch (day % 10) {
+    case 1:
+      return `${day}st`
+    case 2:
+      return `${day}nd`
+    case 3:
+      return `${day}rd`
+    default:
+      return `${day}th`
+  }
+}
+
+// e.g. "Saturday 5th September" — used as the default name for a new
+// shopping list, so it's ready to use as-is for "this week's shop".
+export function formatFullDate(date: Date): string {
+  const weekday = WEEKDAY_LABELS[pythonWeekday(date)]
+  const month = MONTH_LABELS[date.getMonth()]
+  return `${weekday} ${ordinal(date.getDate())} ${month}`
+}
