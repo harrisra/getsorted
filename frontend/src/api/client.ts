@@ -426,6 +426,25 @@ export async function refreshGroceryItemPrice(
   return response.json()
 }
 
+export interface PopulateFromTrolleyResult extends GroceryItem {
+  /** Store names trolley.co.uk listed that don't match any known Store —
+   * their prices were found but couldn't be saved anywhere. */
+  unmatched_stores: string[]
+}
+
+// Creates a new grocery item entirely from a trolley.co.uk product page —
+// name, size, image, trolley_url, and a store price for every store
+// trolley.co.uk lists a price for that matches a known Store.
+export async function populateGroceryItemFromTrolley(
+  trolleyUrl: string,
+): Promise<PopulateFromTrolleyResult> {
+  const response = await apiFetch('/api/catalog/grocery-items/populate-from-trolley/', {
+    method: 'POST',
+    body: JSON.stringify({ trolley_url: trolleyUrl }),
+  })
+  return response.json()
+}
+
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 
 export interface GroceryItemRef {

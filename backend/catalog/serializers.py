@@ -121,3 +121,7 @@ class RefreshPriceRequestSerializer(serializers.Serializer):
     # sitting in an unsaved edit (see GroceryItemViewSet.refresh_price) —
     # falls back to the item's already-stored trolley_url when omitted.
     trolley_url = serializers.URLField(required=False, allow_blank=True)
+
+
+class PopulateFromTrolleyRequestSerializer(serializers.Serializer):
+    trolley_url = serializers.URLField()

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
 import {
   AISLE_OPTIONS,
   ApiError,
@@ -9,6 +10,7 @@ import {
   deleteGroceryItem,
   fetchGroceryItems,
   fetchStores,
+  populateGroceryItemFromTrolley,
   updateGroceryItem,
 } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
@@ -39,6 +41,13 @@ export function GroceryItemsPage() {
   const [storeFilter, setStoreFilter] = useState('')
   const [textFilter, setTextFilter] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showTrolleyForm, setShowTrolleyForm] = useState(false)
+  const [trolleyUrlInput, setTrolleyUrlInput] = useState('')
+  const [addingFromTrolley, setAddingFromTrolley] = useState(false)
+  const [trolleyMessage, setTrolleyMessage] = useState<{
+    kind: 'error' | 'notice'
+    text: string
+  } | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [importing, setImporting] = useState(false)
@@ -182,6 +191,35 @@ export function GroceryItemsPage() {
     }
   }
 
+  async function handleAddFromTrolley(event: FormEvent) {
+    event.preventDefault()
+    const url = trolleyUrlInput.trim()
+    if (!url) return
+    setTrolleyMessage(null)
+    setAddingFromTrolley(true)
+    try {
+      const created = await populateGroceryItemFromTrolley(url)
+      await refresh()
+      setTrolleyUrlInput('')
+      setShowTrolleyForm(false)
+      const notes = [`Added "${created.name}" with ${created.store_prices.length} store price(s).`]
+      if (created.unmatched_stores.length > 0) {
+        notes.push(`Not on the known store list: ${created.unmatched_stores.join(', ')}.`)
+      }
+      setTrolleyMessage({ kind: 'notice', text: notes.join(' ') })
+    } catch (err) {
+      setTrolleyMessage({
+        kind: 'error',
+        text:
+          err instanceof ApiError
+            ? Object.values(err.fieldErrors).flat().join(' ')
+            : 'Could not add that item. Please try again.',
+      })
+    } finally {
+      setAddingFromTrolley(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-[58.8rem] space-y-6 p-4 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -245,6 +283,15 @@ export function GroceryItemsPage() {
               }
             }}
           />
+          {!showTrolleyForm && (
+            <button
+              type="button"
+              onClick={() => setShowTrolleyForm(true)}
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Add from Trolley
+            </button>
+          )}
           {!showAddForm && (
             <button
               type="button"
@@ -265,6 +312,61 @@ export function GroceryItemsPage() {
 
       {deleteMessage && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteMessage}</p>
+      )}
+
+      {showTrolleyForm && (
+        <form
+          onSubmit={handleAddFromTrolley}
+          className="space-y-2 rounded-lg border border-slate-200 bg-white p-4"
+        >
+          <div>
+            <span className="text-sm font-medium text-slate-700">Add from Trolley</span>
+            <p className="text-xs text-slate-500">
+              Paste a trolley.co.uk product page URL — its name, size, image, and every listed
+              store's price are filled in automatically.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              required
+              autoFocus
+              placeholder="https://www.trolley.co.uk/product/…"
+              value={trolleyUrlInput}
+              onChange={(e) => setTrolleyUrlInput(e.target.value)}
+              className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={addingFromTrolley || !trolleyUrlInput.trim()}
+              className="shrink-0 rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+            >
+              {addingFromTrolley ? 'Adding…' : 'Add'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowTrolleyForm(false)
+                setTrolleyMessage(null)
+              }}
+              className="shrink-0 rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {trolleyMessage && (
+        <p
+          className={`rounded-md px-3 py-2 text-sm ${
+            trolleyMessage.kind === 'error'
+              ? 'bg-red-50 text-red-700'
+              : 'bg-slate-100 text-slate-700'
+          }`}
+        >
+          {trolleyMessage.text}
+        </p>
       )}
 
       {showAddForm && (

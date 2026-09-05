@@ -1,3 +1,4 @@
+import json
 import re
 
 import requests
@@ -10,6 +11,7 @@ from rest_framework.response import Response
 from .models import GroceryItem, GroceryItemPrice, Store, is_trolley_url
 from .serializers import (
     GroceryItemSerializer,
+    PopulateFromTrolleyRequestSerializer,
     RefreshPriceRequestSerializer,
     StoreSerializer,
 )
@@ -21,8 +23,8 @@ SCRAPE_USER_AGENT = (
 
 # Bounds a trolley.co.uk page down to just its per-store comparison table —
 # from its opening tag to the next top-level </section> (holds true across
-# every product page checked; see _scrape_trolley_prices for why this
-# scoping matters).
+# every product page checked; see _extract_store_rows for why this scoping
+# matters).
 COMPARISON_TABLE_RE = re.compile(r'class="comparison-table".*?</section>', re.DOTALL)
 
 # One row of that table: a store's logo/title, then that store's price for
@@ -34,6 +36,24 @@ STORE_ROW_RE = re.compile(
     re.DOTALL,
 )
 
+# trolley.co.uk's own schema.org Product block, e.g.
+# {"@type": "Product", "name": "Cathedral City Extra Mature Cheddar Cheese
+# (550g)", "image": ["https://www.trolley.co.uk/img/product/WIB886"], ...} —
+# used by populate_from_trolley for the product's name/size/image (its
+# "offers.price" is NOT used — see _extract_store_rows for why a single
+# price isn't trustworthy).
+JSON_LD_RE = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.DOTALL)
+
+# A product's size, embedded in trolley.co.uk's own name for it as a
+# trailing parenthetical, e.g. "... Cheddar Cheese (550g)" or "... Curry
+# Sauce (350g)" — split out into (base name, size text).
+NAME_SIZE_RE = re.compile(r"^(.*?)\s*\(([^()]+)\)\s*$")
+
+# The size text itself, e.g. "350g", "1.5kg", "500ml", "6 pack".
+SIZE_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(kg|g|litres?|l|ml)\b|(\d+)\s*(?:x|pack|pieces?|pcs?)\b", re.IGNORECASE
+)
+
 
 def _normalize_store_name(name):
     """Lowercase, alphanumeric-only comparison key so store names that
@@ -43,28 +63,11 @@ def _normalize_store_name(name):
     return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
-def _scrape_trolley_prices(trolley_url):
-    """Fetch every store's current price for a product from its trolley.co.uk
-    page.
+def _fetch_trolley_page(trolley_url):
+    """Fetch a trolley.co.uk product page's raw HTML.
 
-    trolley.co.uk price-compares one product across several supermarkets on
-    a single page. Its schema.org Product/Offer JSON-LD block — which looked
-    like the obvious thing to parse — only ever gives the single CHEAPEST
-    price across every store listed, not each store's own price: confirmed
-    by hand against
-    https://www.trolley.co.uk/product/loyd-grossman-tikka-masala-sauce/XVR292,
-    where the JSON-LD price (£2.84, Asda/Amazon) differs from Tesco's own row
-    on that same page (£3.00).
-
-    So instead this walks the page's own per-store comparison table (each
-    row: a store logo/title plus that store's price) and returns every row
-    found there, for the caller to match against the app's own Store list
-    and upsert a GroceryItemPrice per match (see GroceryItemViewSet.refresh_price).
-
-    Returns (rows, error): exactly one is None. `rows` is a list of
-    (store_name, price) tuples, price as a decimal string e.g. "0.85".
-    `error` is a (response_body, http_status) pair ready to hand straight to
-    Response(*error).
+    Returns (html, error): exactly one is None. `error` is a (response_body,
+    http_status) pair ready to hand straight to Response(*error).
     """
     if not is_trolley_url(trolley_url):
         return None, (
@@ -80,12 +83,34 @@ def _scrape_trolley_prices(trolley_url):
             {"detail": "Could not reach trolley.co.uk. Try again later."},
             status.HTTP_502_BAD_GATEWAY,
         )
+    return response.text, None
 
+
+def _extract_store_rows(html):
+    """Every store's current price for a product, from an already-fetched
+    trolley.co.uk page.
+
+    trolley.co.uk price-compares one product across several supermarkets on
+    a single page. Its schema.org Product/Offer JSON-LD block — which looked
+    like the obvious thing to parse — only ever gives the single CHEAPEST
+    price across every store listed, not each store's own price: confirmed
+    by hand against
+    https://www.trolley.co.uk/product/loyd-grossman-tikka-masala-sauce/XVR292,
+    where the JSON-LD price (£2.84, Asda/Amazon) differs from Tesco's own row
+    on that same page (£3.00).
+
+    So instead this walks the page's own per-store comparison table (each
+    row: a store logo/title plus that store's price) and returns every row
+    found there, for the caller to match against the app's own Store list.
+
+    Returns (rows, error): exactly one is None. `rows` is a list of
+    (store_name, price) tuples, price as a decimal string e.g. "0.85".
+    """
     # Scoped to just the comparison table, not the whole page — trolley.co.uk
     # also has "alternative products" widgets elsewhere on the page using the
     # same _price/store-logo markup for entirely different products, which
     # would otherwise be a second way to pick up the wrong price.
-    table_match = COMPARISON_TABLE_RE.search(response.text)
+    table_match = COMPARISON_TABLE_RE.search(html)
     if not table_match:
         return None, (
             {"detail": "Could not find a price comparison table on that trolley.co.uk page."},
@@ -97,6 +122,117 @@ def _scrape_trolley_prices(trolley_url):
         for row_store, price in STORE_ROW_RE.findall(table_match.group(0))
     ]
     return rows, None
+
+
+def _scrape_trolley_prices(trolley_url):
+    """Fetch + extract every store's current price for a product from its
+    trolley.co.uk page — see _fetch_trolley_page/_extract_store_rows."""
+    html, error = _fetch_trolley_page(trolley_url)
+    if error:
+        return None, error
+    return _extract_store_rows(html)
+
+
+def _parse_size(text):
+    """Best-effort grams/pieces/milliliters from a free-text size string
+    such as '350g', '1.5kg', '500ml', '6 pack'. Returns (grams, pieces,
+    milliliters), each None if nothing matched."""
+    if not text:
+        return None, None, None
+    match = SIZE_RE.search(text)
+    if not match:
+        return None, None, None
+    amount, unit, count = match.group(1), match.group(2), match.group(3)
+    if count is not None:
+        return None, int(count), None
+    amount = float(amount)
+    unit = unit.lower()
+    if unit == "kg":
+        return round(amount * 1000), None, None
+    if unit == "g":
+        return round(amount), None, None
+    if unit in ("l", "litre", "litres"):
+        return None, None, round(amount * 1000)
+    if unit == "ml":
+        return None, None, round(amount)
+    return None, None, None
+
+
+def _split_name_and_size(raw_name):
+    """trolley.co.uk's own product names embed size as a trailing
+    parenthetical, e.g. "Cathedral City Extra Mature Cheddar Cheese
+    (550g)" — split that into a name matching this app's own convention
+    (e.g. "... Cheddar Cheese 550g", no parens) plus the separate size
+    fields GroceryItem expects. Returns (name, grams, pieces, milliliters);
+    if the parenthetical isn't a recognizable size (e.g. a flavor variant),
+    returns the name unchanged and every size field None, rather than
+    silently dropping it.
+    """
+    match = NAME_SIZE_RE.match(raw_name)
+    if not match:
+        return raw_name, None, None, None
+    base_name, size_text = match.group(1).strip(), match.group(2).strip()
+    grams, pieces, milliliters = _parse_size(size_text)
+    if grams is None and pieces is None and milliliters is None:
+        return raw_name, None, None, None
+    return f"{base_name} {size_text}", grams, pieces, milliliters
+
+
+def _scrape_trolley_product(trolley_url):
+    """Fetch a trolley.co.uk product page's name, size, image, and every
+    store's current price for it — everything populate_from_trolley needs
+    to create a fully-populated GroceryItem from just that one URL.
+
+    Returns (data, error): exactly one is None. `data` is
+    {"name", "grams", "pieces", "milliliters", "image_url", "store_prices"}
+    — store_prices is the same (store_name, price) list _scrape_trolley_prices
+    returns; empty (not an error) if the page's comparison table couldn't be
+    found, since the product details alone are still worth creating an item
+    from.
+    """
+    html, error = _fetch_trolley_page(trolley_url)
+    if error:
+        return None, error
+
+    json_ld_match = JSON_LD_RE.search(html)
+    if not json_ld_match:
+        return None, (
+            {"detail": "Could not find product details on that trolley.co.uk page."},
+            status.HTTP_502_BAD_GATEWAY,
+        )
+    try:
+        product = json.loads(json_ld_match.group(1))
+    except ValueError:
+        return None, (
+            {"detail": "Could not parse product details from that trolley.co.uk page."},
+            status.HTTP_502_BAD_GATEWAY,
+        )
+
+    raw_name = (product.get("name") or "").strip()
+    if not raw_name:
+        return None, (
+            {"detail": "Could not determine the product name from that trolley.co.uk page."},
+            status.HTTP_502_BAD_GATEWAY,
+        )
+    name, grams, pieces, milliliters = _split_name_and_size(raw_name)
+
+    image_url = ""
+    images = product.get("image")
+    if isinstance(images, list) and images:
+        image_url = images[0]
+    elif isinstance(images, str):
+        image_url = images
+
+    store_prices, _rows_error = _extract_store_rows(html)
+
+    return {
+        "name": name,
+        "grams": grams,
+        "pieces": pieces,
+        "milliliters": milliliters,
+        "image_url": image_url,
+        "store_prices": store_prices or [],
+    }, None
 
 
 class StoreViewSet(viewsets.ReadOnlyModelViewSet):
@@ -127,6 +263,59 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
         if instance.created_by_id is not None and instance.created_by_id != self.request.user.id:
             raise PermissionDenied("Only the account that added this item can delete it.")
         instance.delete()
+
+    @action(detail=False, methods=["post"], url_path="populate-from-trolley")
+    def populate_from_trolley(self, request):
+        """Create a new GroceryItem entirely from a trolley.co.uk product
+        page — name, size, image, trolley_url, and a GroceryItemPrice for
+        every store trolley.co.uk lists a price for that matches a known
+        Store (others are reported back as unmatched_stores, same as
+        refresh_price). Fails with a normal validation error if the page's
+        name doesn't yield a usable size, same rule as adding one by hand.
+
+        Open to any signed-in user — same trust level as refresh_price (a
+        plain scrape of a public page, no third-party API, no bot-block
+        risk).
+        """
+        request_serializer = PopulateFromTrolleyRequestSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        trolley_url = request_serializer.validated_data["trolley_url"]
+
+        product, error = _scrape_trolley_product(trolley_url)
+        if error:
+            body, error_status = error
+            return Response(body, status=error_status)
+
+        stores_by_normalized_name = {_normalize_store_name(s.name): s for s in Store.objects.all()}
+        store_prices_data = []
+        unmatched_stores = []
+        for row_store, price in product["store_prices"]:
+            store = stores_by_normalized_name.get(_normalize_store_name(row_store))
+            if store is None:
+                unmatched_stores.append(row_store)
+                continue
+            store_prices_data.append({"store": str(store.id), "price": price, "product_url": ""})
+
+        serializer = GroceryItemSerializer(
+            data={
+                "name": product["name"],
+                "brand": "",
+                "aisle": "",
+                "grams": product["grams"],
+                "pieces": product["pieces"],
+                "milliliters": product["milliliters"],
+                "trolley_url": trolley_url,
+                "image_url": product["image_url"],
+                "store_prices": store_prices_data,
+            },
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(created_by=request.user)
+        return Response(
+            {**serializer.data, "unmatched_stores": unmatched_stores},
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["post"], url_path="refresh-price")
     def refresh_price(self, request, pk=None):
