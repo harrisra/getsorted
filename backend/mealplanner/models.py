@@ -418,6 +418,13 @@ class ShoppingListItem(models.Model):
         related_name="shopping_list_items",
     )
     is_checked = models.BooleanField(default=False)
+    # Manual override of packs_needed below (the +/- buttons on the
+    # shopping list view) — e.g. rounding up to a multipack deal, or simply
+    # knowing better than the computed amount. Cleared whenever the needed
+    # amount changes (see add_or_merge_shopping_list_item), since an
+    # override computed for the old amount isn't necessarily still right
+    # for a new one.
+    packs_override = models.PositiveIntegerField(null=True, blank=True)
     added_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
     )
@@ -432,9 +439,12 @@ class ShoppingListItem(models.Model):
     @property
     def packs_needed(self):
         """How many of the matched grocery item to buy to cover the amount
-        needed, rounded up (e.g. needing 500g from a 200g pack means 3).
-        None if there's no matched item, no needed-amount data, or no unit
-        (grams/milliliters/pieces) shared between the two to compare."""
+        needed, rounded up (e.g. needing 500g from a 200g pack means 3) —
+        packs_override instead, when set. None if there's no override, no
+        matched item, no needed-amount data, or no unit (grams/milliliters/
+        pieces) shared between the item and the amount needed to compare."""
+        if self.packs_override is not None:
+            return self.packs_override
         if not self.grocery_item_price:
             return None
         item = self.grocery_item_price.grocery_item

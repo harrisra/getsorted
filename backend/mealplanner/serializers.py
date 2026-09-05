@@ -478,6 +478,7 @@ class ShoppingListItemSerializer(serializers.ModelSerializer):
             "milliliters",
             "grocery_item_price",
             "grocery_item_price_detail",
+            "packs_override",
             "packs_needed",
             "is_checked",
             "added_by",

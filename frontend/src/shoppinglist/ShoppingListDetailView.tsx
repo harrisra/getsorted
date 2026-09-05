@@ -407,6 +407,16 @@ export function ShoppingListDetailView({
     await refresh()
   }
 
+  // The +/- buttons next to the packs count — sets an explicit
+  // packs_override rather than trusting the computed packs_needed, e.g. to
+  // round up to a multipack deal or just override a computation that's
+  // wrong for this particular shop. Floored at 0 rather than going negative.
+  async function handlePacksOverrideChange(item: ShoppingListItem, delta: number) {
+    const next = Math.max(0, (item.packs_needed ?? 0) + delta)
+    await updateShoppingListItem(item.id, { packs_override: next })
+    await refresh()
+  }
+
   async function handleDelete(id: string) {
     await deleteShoppingListItem(id)
     await refresh()
@@ -427,6 +437,7 @@ export function ShoppingListDetailView({
         pieces: parseAmount(newItemPieces),
         milliliters: parseAmount(newItemMilliliters),
         grocery_item_price: null,
+        packs_override: null,
         is_checked: false,
       })
       setNewItemName('')
@@ -462,6 +473,7 @@ export function ShoppingListDetailView({
         pieces: option.pieces,
         milliliters: option.milliliters,
         grocery_item_price: option.id,
+        packs_override: null,
         is_checked: false,
       })
       await refresh()
@@ -966,10 +978,39 @@ export function ShoppingListDetailView({
                       )}
                     </div>
                     {/* Packs needed of the matched product, to the right of
-                        the dropdown. */}
-                    <span className="w-10 shrink-0 text-base font-semibold text-slate-600">
-                      {item.packs_needed != null ? `× ${item.packs_needed}` : ''}
-                    </span>
+                        the dropdown — +/- override it manually (e.g. to
+                        round up to a multipack deal, or just correct a
+                        computation that's wrong for this shop) whenever a
+                        product's actually matched, fixed-width regardless
+                        so this column still lines up on rows with no match
+                        to override. */}
+                    <div className="flex w-28 shrink-0 items-center justify-end gap-1">
+                      {item.grocery_item_price && (
+                        <button
+                          type="button"
+                          onClick={() => handlePacksOverrideChange(item, -1)}
+                          title="One fewer pack"
+                          aria-label="One fewer pack"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-slate-300 text-slate-500 hover:bg-slate-100"
+                        >
+                          −
+                        </button>
+                      )}
+                      <span className="text-base font-semibold text-slate-600">
+                        {item.packs_needed != null ? `× ${item.packs_needed}` : ''}
+                      </span>
+                      {item.grocery_item_price && (
+                        <button
+                          type="button"
+                          onClick={() => handlePacksOverrideChange(item, 1)}
+                          title="One more pack"
+                          aria-label="One more pack"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-slate-300 text-slate-500 hover:bg-slate-100"
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
                     {/* Total cost for this row: packs needed × pack price. */}
                     <span className="w-16 shrink-0 text-right text-sm font-medium text-slate-700">
                       {formatRowCost(item) ?? ''}

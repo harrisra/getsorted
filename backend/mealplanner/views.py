@@ -216,8 +216,15 @@ def add_or_merge_shopping_list_item(
             existing.meal_plan_id = None
         # The matched product isn't touched by a merge — combining
         # quantities shouldn't silently swap out a match someone already
-        # chose (or set one on an item that deliberately had none).
-        existing.save(update_fields=["grams", "pieces", "milliliters", "meal_plan"])
+        # chose (or set one on an item that deliberately had none). A manual
+        # packs_override IS cleared when the needed amount actually grows,
+        # though — it was set for the old amount, so keeping it would
+        # silently understate how many packs are really needed now.
+        if grams or pieces or milliliters:
+            existing.packs_override = None
+        existing.save(
+            update_fields=["grams", "pieces", "milliliters", "meal_plan", "packs_override"]
+        )
         return existing, False
 
     item = ShoppingListItem.objects.create(

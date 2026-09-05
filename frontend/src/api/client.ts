@@ -837,9 +837,16 @@ export interface ShoppingListItem {
   /** The specific catalog product+store price chosen for this item. */
   grocery_item_price: string | null
   grocery_item_price_detail: GroceryItemRef | null
+  /** Manual override of packs_needed below (the +/- buttons on the
+   * shopping list view) — null unless the user has adjusted it. Cleared
+   * server-side whenever this item's needed amount changes (a merge from
+   * generate/add-essentials), since an override for the old amount isn't
+   * necessarily still right. */
+  packs_override: number | null
   /** How many of grocery_item_price's packs to buy to cover the amount
-   * needed (ceiling division), or null if there's no match or no shared
-   * unit to compare against. Server-computed. */
+   * needed (ceiling division) — packs_override instead, when set. null if
+   * there's no override, no match, or no shared unit to compare against.
+   * Server-computed. */
   packs_needed: number | null
   is_checked: boolean
   added_by: string | null
