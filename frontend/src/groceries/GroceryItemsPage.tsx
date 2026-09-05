@@ -276,23 +276,6 @@ export function GroceryItemsPage() {
           />
           <button
             type="button"
-            onClick={handleExportSelected}
-            disabled={selectedIds.size === 0}
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-          >
-            Export selected ({selectedIds.size})
-          </button>
-          <ConfirmDeleteButton
-            label="Delete selected grocery items"
-            confirmMessage={`Delete ${selectedIds.size} item(s)?`}
-            disabled={selectedIds.size === 0}
-            onConfirm={handleDeleteSelected}
-            className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-          >
-            Delete selected ({selectedIds.size})
-          </ConfirmDeleteButton>
-          <button
-            type="button"
             onClick={handleRefreshAllPrices}
             disabled={refreshingAll || !items?.some((i) => i.trolley_url)}
             title="Re-fetch prices from trolley.co.uk for every item with a trolley.co.uk URL"
@@ -436,17 +419,34 @@ export function GroceryItemsPage() {
         <p className="text-sm text-slate-500">No grocery items match your filters.</p>
       )}
 
-      {filteredItems !== null && filteredItems.length > 0 && (
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={toggleSelectAll}
-            aria-label="Select all grocery items"
-            className="h-4 w-4 shrink-0 rounded border-slate-300"
-          />
-          Select all
-        </label>
+      {/* Only worth showing once something's actually selected — with
+          nothing selected there's nothing to export/delete, and "select
+          all" is just the individual per-row checkboxes' job until then. */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleSelectAll}
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+          >
+            {allSelected ? 'Deselect all' : 'Select all'}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportSelected}
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+          >
+            Export selected ({selectedIds.size})
+          </button>
+          <ConfirmDeleteButton
+            label="Delete selected grocery items"
+            confirmMessage={`Delete ${selectedIds.size} item(s)?`}
+            onConfirm={handleDeleteSelected}
+            className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+          >
+            Delete selected ({selectedIds.size})
+          </ConfirmDeleteButton>
+        </div>
       )}
 
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
