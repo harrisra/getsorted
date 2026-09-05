@@ -221,12 +221,16 @@ function AccordionSection({
   children: ReactNode
 }) {
   return (
-    <div>
+    // flex-1 (and min-h-0, so it can actually shrink and scroll internally
+    // instead of just growing past the panel) only for whichever section
+    // is currently open — that's what makes it take up all the remaining
+    // vertical space instead of just being as tall as its own content.
+    <div className={`flex flex-col ${isOpen ? 'min-h-0 flex-1' : 'shrink-0'}`}>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
-        className={`flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium transition ${
+        className={`flex w-full shrink-0 items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium transition ${
           isOpen ? 'bg-slate-800 text-white' : 'text-slate-700 hover:bg-slate-50'
         }`}
       >
@@ -237,7 +241,9 @@ function AccordionSection({
           }`}
         />
       </button>
-      {isOpen && <div className="space-y-3 bg-white p-4">{children}</div>}
+      {isOpen && (
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-white p-4">{children}</div>
+      )}
     </div>
   )
 }
@@ -626,10 +632,15 @@ export function ShoppingListDetailView({
             100vh calc that had to guess how much of the viewport other
             chrome like the footer status bar was taking, which came up
             short and left <main> itself still needing to scroll too, i.e.
-            two scrollbars) and its own overflow-y-auto — a genuinely
-            separate scrolling panel, not a grid/flex column whose height or
-            scroll position gets tied to the item list beside it. */}
-        <div className="divide-y divide-slate-200 overflow-y-auto border border-slate-200 lg:h-full lg:w-[30rem] lg:shrink-0">
+            two scrollbars) — a genuinely separate scrolling panel, not a
+            grid/flex column whose height or scroll position gets tied to
+            the item list beside it. flex flex-col so whichever section is
+            currently open (flex-1 — see AccordionSection) fills all the
+            remaining vertical space instead of just sitting as tall as its
+            own content, with the other collapsed headers stacked above/
+            below it; each open section scrolls internally rather than this
+            outer box, so no overflow-y-auto here. */}
+        <div className="flex flex-col divide-y divide-slate-200 border border-slate-200 lg:h-full lg:w-[30rem] lg:shrink-0">
           <AccordionSection
             title="Generate from planned meals"
             isOpen={openSection === 'generate'}
