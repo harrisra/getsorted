@@ -48,9 +48,12 @@ export function ShoppingListsPage() {
     // Full-width here (not the centered max-w-[58.8rem] the browse page
     // uses) — ShoppingListDetailView pins its own left panel to the left
     // edge and centers the list in whatever's left, which needs the whole
-    // viewport width to work with rather than a pre-capped column.
+    // viewport width to work with rather than a pre-capped column. No
+    // padding here at all — the accordion panel is meant to sit flush
+    // against the top/left/bottom edges, so ShoppingListDetailView applies
+    // its own padding to just the right (shopping list) panel instead.
     return (
-      <div className="h-full w-full p-4 sm:p-8">
+      <div className="h-full w-full">
         <ShoppingListDetailView
           list={selectedList}
           onBack={() => setSelectedListId(null)}

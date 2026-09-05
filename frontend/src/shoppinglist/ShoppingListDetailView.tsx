@@ -865,13 +865,16 @@ export function ShoppingListDetailView({
             next to the left panel, in its own scrolling box (same h-full
             approach as the left panel, so <main> itself never has to
             scroll — see the note there on why a 100vh calc gave two
-            scrollbars). min-w-0 overrides the flex item's default
-            min-width: auto — without it, this column refuses to shrink
-            below the item row's intrinsic content width (several
-            fixed-width, non-wrapping controls), which was forcing a
-            horizontal scrollbar instead of the row content reflowing to
-            fit. */}
-        <div className="min-w-0 w-full flex-1 space-y-4 lg:h-full lg:overflow-y-auto">
+            scrollbars). Its own top/right/bottom padding — the page
+            wrapper (ShoppingListsPage) no longer has any, since the left
+            panel is meant to sit flush against those edges; no left
+            padding here since gap-6 already separates it from the left
+            panel. min-w-0 overrides the flex item's default min-width:
+            auto — without it, this column refuses to shrink below the item
+            row's intrinsic content width (several fixed-width, non-
+            wrapping controls), which was forcing a horizontal scrollbar
+            instead of the row content reflowing to fit. */}
+        <div className="min-w-0 w-full flex-1 space-y-4 pb-4 pr-4 pt-4 sm:pb-8 sm:pr-8 sm:pt-8 lg:h-full lg:overflow-y-auto">
           {editingName ? (
             <form
               onSubmit={handleRename}
