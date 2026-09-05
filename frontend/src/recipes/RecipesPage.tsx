@@ -6,6 +6,7 @@ import {
   createRecipe,
   deleteRecipe,
   deleteRecipeImage,
+  fetchGroceryItems,
   fetchRecipes,
   updateRecipe,
   uploadRecipeImage,
@@ -137,7 +138,8 @@ export function RecipesPage() {
     setImportMessage(null)
     setImporting(true)
     try {
-      const { recipes: toImport, fileErrors } = await parseImportFiles(files, householdId)
+      const groceryItems = await fetchGroceryItems()
+      const { recipes: toImport, fileErrors } = await parseImportFiles(files, householdId, groceryItems)
 
       let succeeded = 0
       const importErrors: string[] = []

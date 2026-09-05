@@ -1,11 +1,15 @@
-import type { MealType, Recipe, RecipeInput } from '../api/client'
+import type { GroceryItem, MealType, Recipe, RecipeInput } from '../api/client'
 
 // The portable shape used for export/import files. Deliberately excludes
 // anything household- or catalog-specific (id, household, created_by,
-// created_at, image, current_cost, and any grocery-item store matches) so a
-// file can be shared or re-imported anywhere without dragging along data
-// that wouldn't make sense outside the household — or even the catalog —
-// it came from.
+// created_at, image, current_cost) so a file can be shared or re-imported
+// anywhere without dragging along data that wouldn't make sense outside the
+// household it came from. Each ingredient's grocery matches are the one
+// exception — kept as the matched product's NAME (not its id, which is only
+// meaningful within this deployment's catalog) so re-importing into a
+// catalog that happens to have a product of the same name reconnects the
+// match (see toRecipeInput below) — a plain exact-name match, nothing
+// fuzzier.
 export interface ExportedRecipe {
   name: string
   meal_type: MealType
@@ -18,6 +22,7 @@ export interface ExportedRecipe {
     grams: number | null
     pieces: number | null
     milliliters: number | null
+    grocery_matches: string[]
   }[]
 }
 
@@ -34,6 +39,7 @@ function toExportedRecipe(recipe: Recipe): ExportedRecipe {
       grams: ing.grams,
       pieces: ing.pieces,
       milliliters: ing.milliliters,
+      grocery_matches: ing.grocery_matches.map((match) => match.grocery_item_detail.name),
     })),
   }
 }
@@ -68,7 +74,7 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function toRecipeInput(item: unknown, householdId: string): RecipeInput | null {
+function toRecipeInput(item: unknown, householdId: string, groceryItems: GroceryItem[]): RecipeInput | null {
   if (!isPlainRecord(item) || typeof item.name !== 'string' || !item.name.trim()) {
     return null
   }
@@ -81,16 +87,25 @@ function toRecipeInput(item: unknown, householdId: string): RecipeInput | null {
     instructions: typeof item.instructions === 'string' ? item.instructions : '',
     source_url: typeof item.source_url === 'string' ? item.source_url : '',
     image_url: typeof item.image_url === 'string' ? item.image_url : '',
-    ingredients: rawIngredients.filter(isPlainRecord).map((ing) => ({
-      name: typeof ing.name === 'string' ? ing.name : '',
-      grams: typeof ing.grams === 'number' ? ing.grams : null,
-      pieces: typeof ing.pieces === 'number' ? ing.pieces : null,
-      milliliters: typeof ing.milliliters === 'number' ? ing.milliliters : null,
-      // Grocery matches are intentionally ignored on import, even if a file
-      // happens to include some (e.g. a hand-edited export) — they're
-      // catalog-specific and wouldn't make sense re-imported elsewhere.
-      grocery_matches: [],
-    })),
+    ingredients: rawIngredients.filter(isPlainRecord).map((ing) => {
+      // Reconnect each match by an exact name match against this catalog —
+      // nothing fuzzier — dropping any name that isn't currently in it
+      // rather than failing the import over it.
+      const matchNames = Array.isArray(ing.grocery_matches) ? ing.grocery_matches : []
+      const grocery_matches = matchNames
+        .filter((name): name is string => typeof name === 'string')
+        .map((name) => groceryItems.find((gi) => gi.name === name))
+        .filter((gi): gi is GroceryItem => gi !== undefined)
+        .map((gi) => ({ grocery_item: gi.id }))
+
+      return {
+        name: typeof ing.name === 'string' ? ing.name : '',
+        grams: typeof ing.grams === 'number' ? ing.grams : null,
+        pieces: typeof ing.pieces === 'number' ? ing.pieces : null,
+        milliliters: typeof ing.milliliters === 'number' ? ing.milliliters : null,
+        grocery_matches,
+      }
+    }),
   }
 }
 
@@ -98,9 +113,13 @@ function toRecipeInput(item: unknown, householdId: string): RecipeInput | null {
 // object or an array of them, and flattens them into RecipeInputs ready to
 // POST. Files that aren't valid JSON, or entries missing a name, are
 // reported back separately rather than failing the whole import.
+// `groceryItems` is the current grocery catalog, used to reconnect each
+// ingredient's grocery matches by exact product name (see toRecipeInput) —
+// a match whose name isn't in it is simply dropped.
 export async function parseImportFiles(
   files: FileList,
   householdId: string,
+  groceryItems: GroceryItem[],
 ): Promise<{ recipes: RecipeInput[]; fileErrors: string[] }> {
   const recipes: RecipeInput[] = []
   const fileErrors: string[] = []
@@ -117,7 +136,7 @@ export async function parseImportFiles(
     const items = Array.isArray(parsed) ? parsed : [parsed]
     let validInFile = 0
     for (const item of items) {
-      const input = toRecipeInput(item, householdId)
+      const input = toRecipeInput(item, householdId, groceryItems)
       if (input) {
         recipes.push(input)
         validInFile++
