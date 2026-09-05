@@ -800,19 +800,9 @@ export function ShoppingListDetailView({
                         className="h-8 w-8 shrink-0 rounded border border-slate-200 object-cover"
                       />
                     )}
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-slate-800">{option.name}</p>
-                      {option.price && (
-                        <p className="text-xs text-slate-500">
-                          £{option.price}
-                          {option.promo_price && (
-                            <span className="font-medium text-amber-600"> (promo £{option.promo_price})</span>
-                          )}
-                        </p>
-                      )}
-                    </div>
+                    <p className="min-w-0 break-words text-sm text-slate-800">{option.name}</p>
                   </div>
-                  {/* Store column, between the item name and the Add button —
+                  {/* Store column, between the item name and the price —
                       just the logo when we have one, since it identifies the
                       store on its own; falls back to the name as text for a
                       store with no logo on file. */}
@@ -824,6 +814,17 @@ export function ShoppingListDetailView({
                       <StoreLogo name={option.storeName} className="h-4 w-auto" />
                     ) : (
                       option.storeName
+                    )}
+                  </span>
+                  {/* Price, right-aligned, right before the Add button. */}
+                  <span className="w-20 shrink-0 text-right text-xs text-slate-500">
+                    {option.price && (
+                      <>
+                        £{option.price}
+                        {option.promo_price && (
+                          <span className="block font-medium text-amber-600">promo £{option.promo_price}</span>
+                        )}
+                      </>
                     )}
                   </span>
                   <button
