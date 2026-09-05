@@ -203,55 +203,59 @@ export function ItemGroceryMatchesEditor<T extends QuantifiedItem>({
                 split into two columns (rather than the matches stacked
                 below, indented) so a row's details and its matches line up
                 side by side instead of one on top of the other. */}
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="text"
-                placeholder={itemNamePlaceholder}
-                value={row.name}
-                onChange={(e) => update(index, { name: e.target.value } as Partial<T>)}
-                className="min-w-[8rem] flex-[2] rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
-              />
-              <input
-                type="number"
-                min={0}
-                placeholder="Grams"
-                value={row.grams ?? ''}
-                onChange={(e) =>
-                  update(index, { grams: e.target.value === '' ? null : Number(e.target.value) } as Partial<T>)
-                }
-                className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
-              />
-              <input
-                type="number"
-                min={0}
-                placeholder="Pieces"
-                value={row.pieces ?? ''}
-                onChange={(e) =>
-                  update(index, { pieces: e.target.value === '' ? null : Number(e.target.value) } as Partial<T>)
-                }
-                className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
-              />
-              <input
-                type="number"
-                min={0}
-                placeholder="ml"
-                value={row.milliliters ?? ''}
-                onChange={(e) =>
-                  update(index, {
-                    milliliters: e.target.value === '' ? null : Number(e.target.value),
-                  } as Partial<T>)
-                }
-                className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => remove(index)}
-                title="Remove"
-                aria-label="Remove"
-                className="shrink-0 text-red-500 hover:text-red-700"
-              >
-                <TrashIcon className="h-4 w-4" />
-              </button>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder={itemNamePlaceholder}
+                  value={row.name}
+                  onChange={(e) => update(index, { name: e.target.value } as Partial<T>)}
+                  className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => remove(index)}
+                  title="Remove"
+                  aria-label="Remove"
+                  className="shrink-0 text-red-500 hover:text-red-700"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Grams"
+                  value={row.grams ?? ''}
+                  onChange={(e) =>
+                    update(index, { grams: e.target.value === '' ? null : Number(e.target.value) } as Partial<T>)
+                  }
+                  className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Pieces"
+                  value={row.pieces ?? ''}
+                  onChange={(e) =>
+                    update(index, { pieces: e.target.value === '' ? null : Number(e.target.value) } as Partial<T>)
+                  }
+                  className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="ml"
+                  value={row.milliliters ?? ''}
+                  onChange={(e) =>
+                    update(index, {
+                      milliliters: e.target.value === '' ? null : Number(e.target.value),
+                    } as Partial<T>)
+                  }
+                  className="w-20 min-w-[5rem] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                />
+              </div>
             </div>
 
             <div className="space-y-1 lg:border-l lg:border-slate-100 lg:pl-4">
