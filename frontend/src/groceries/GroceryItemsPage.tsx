@@ -39,7 +39,6 @@ export function GroceryItemsPage() {
   const { user } = useAuth()
   const [items, setItems] = useState<GroceryItem[] | null>(null)
   const [stores, setStores] = useState<Store[]>([])
-  const [storeFilter, setStoreFilter] = useState('')
   const [textFilter, setTextFilter] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
   const [showTrolleyForm, setShowTrolleyForm] = useState(false)
@@ -96,7 +95,6 @@ export function GroceryItemsPage() {
   const trimmedTextFilter = textFilter.trim().toLowerCase()
   const filteredItems =
     items?.filter((item) => {
-      if (storeFilter && !item.store_prices.some((sp) => sp.store === storeFilter)) return false
       if (
         trimmedTextFilter &&
         !`${item.name} ${item.brand} ${item.store_prices.map((sp) => sp.store_detail.name).join(' ')}`
@@ -277,19 +275,6 @@ export function GroceryItemsPage() {
             aria-label="Filter by text"
             className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-slate-500 focus:outline-none"
           />
-          <select
-            value={storeFilter}
-            onChange={(e) => setStoreFilter(e.target.value)}
-            aria-label="Filter by store"
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-slate-500 focus:outline-none"
-          >
-            <option value="">All stores</option>
-            {stores.map((store) => (
-              <option key={store.id} value={store.id}>
-                {store.name}
-              </option>
-            ))}
-          </select>
           <button
             type="button"
             onClick={handleExportSelected}
