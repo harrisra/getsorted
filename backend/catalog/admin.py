@@ -32,6 +32,6 @@ class GroceryItemAdmin(admin.ModelAdmin):
 
 @admin.register(GroceryItemPrice)
 class GroceryItemPriceAdmin(admin.ModelAdmin):
-    list_display = ["grocery_item", "store", "price", "updated_at"]
+    list_display = ["grocery_item", "store", "price", "promo_price", "updated_at"]
     list_filter = ["store"]
     search_fields = ["grocery_item__name", "store__name"]
