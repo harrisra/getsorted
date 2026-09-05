@@ -81,10 +81,10 @@ export function GroceryItemsPage() {
   const trimmedTextFilter = textFilter.trim().toLowerCase()
   const filteredItems =
     items?.filter((item) => {
-      if (storeFilter && item.store !== storeFilter) return false
+      if (storeFilter && !item.store_prices.some((sp) => sp.store === storeFilter)) return false
       if (
         trimmedTextFilter &&
-        !`${item.name} ${item.brand} ${item.store_detail.name}`
+        !`${item.name} ${item.brand} ${item.store_prices.map((sp) => sp.store_detail.name).join(' ')}`
           .toLowerCase()
           .includes(trimmedTextFilter)
       ) {
@@ -327,20 +327,6 @@ export function GroceryItemsPage() {
                 <p className="truncate font-medium text-slate-800">{item.name}</p>
                 <p className="truncate text-sm text-slate-500">
                   {[item.brand, formatSize(item), aisleLabel(item)].filter(Boolean).join(' · ')}
-                  {item.price && ` · £${item.price}`}
-                  {item.product_url && (
-                    <>
-                      {' · '}
-                      <a
-                        href={item.product_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        Product page
-                      </a>
-                    </>
-                  )}
                   {item.trolley_url && (
                     <>
                       {' · '}
@@ -355,12 +341,32 @@ export function GroceryItemsPage() {
                     </>
                   )}
                 </p>
+                {item.store_prices.length > 0 && (
+                  <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                    {item.store_prices.map((sp) => (
+                      <li key={sp.id} className="truncate">
+                        <span className="font-medium text-slate-600">{sp.store_detail.name}</span>
+                        {sp.price && ` £${sp.price}`}
+                        {sp.product_url && (
+                          <>
+                            {' · '}
+                            <a
+                              href={sp.product_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              Product page
+                            </a>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-3">
-              <span className="w-24 shrink-0 truncate text-sm text-slate-600" title={item.store_detail.name}>
-                {item.store_detail.name}
-              </span>
               <span
                 className="max-w-[10rem] truncate text-xs text-slate-400"
                 title={item.created_by_email ?? undefined}

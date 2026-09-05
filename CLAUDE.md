@@ -76,18 +76,27 @@ same pattern as `mealplanner`.
 
 #### Catalog
 
-A shared, app-wide product catalog (`Store`, `GroceryItem`) feeding the meal
-planner's shopping list — e.g. so a "Tesco British Cooked Ham Slices 120g" entry is
-added once and reused by every household, rather than each household maintaining
-its own copy. Deliberately **not** Household-scoped, the one exception to the
-sub-app convention above; any signed-in user can view/add/edit entries, but only
-the account that created an entry (`created_by`) can delete it.
+A shared, app-wide product catalog (`Store`, `GroceryItem`, `GroceryItemPrice`)
+feeding the meal planner's shopping list — e.g. so a "Tesco British Cooked Ham
+Slices 120g" entry is added once and reused by every household, rather than each
+household maintaining its own copy. Deliberately **not** Household-scoped, the one
+exception to the sub-app convention above; any signed-in user can view/add/edit
+entries, but only the account that created an entry (`created_by`) can delete it.
+
+A `GroceryItem` is the product itself (name/brand/aisle/size/image/`trolley_url`) —
+it can be priced at several stores at once, each as its own `GroceryItemPrice` row
+(store, price, that store's own `product_url`), rather than needing a duplicate
+`GroceryItem` per store. `RecipeIngredientStoreOption` and `ShoppingListItem` match
+against a specific `GroceryItemPrice` (i.e. a specific store's price for a
+product), not the `GroceryItem` directly, since "which store" now lives there.
 
 It also has one action that fetches product data on the user's behalf:
-`/api/catalog/grocery-items/{id}/refresh-price/` re-fetches an item's price from
-its `trolley_url` (a trolley.co.uk product page) by scraping that page's own
-per-store comparison table, and is open to any signed-in user (no third-party API
-cost, no bot-block risk — see `_scrape_trolley_price` in `catalog/views.py`).
+`/api/catalog/grocery-items/{id}/refresh-price/` re-fetches prices from the item's
+`trolley_url` (a trolley.co.uk product page) by scraping that page's own per-store
+comparison table, and updates/creates a `GroceryItemPrice` for every store row that
+matches a known `Store` (stores absent from that particular page are left alone,
+not cleared). Open to any signed-in user (no third-party API cost, no bot-block
+risk — see `_scrape_trolley_prices` in `catalog/views.py`).
 
 > Pepesto (paid product-lookup API) and a Sainsbury's-own-search scrape used to
 > back "Populate"/"Scrape URLs" buttons on this page, matching a pasted product

@@ -1,29 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
-import type { GroceryItem } from '../api/client'
+import type { GroceryItemStorePriceOption } from '../api/client'
 
-function formatSize(item: GroceryItem): string {
+function formatSize(option: GroceryItemStorePriceOption): string {
   return [
-    item.grams != null ? `${item.grams}g` : null,
-    item.pieces != null ? `${item.pieces}pc` : null,
-    item.milliliters != null ? `${item.milliliters}ml` : null,
+    option.grams != null ? `${option.grams}g` : null,
+    option.pieces != null ? `${option.pieces}pc` : null,
+    option.milliliters != null ? `${option.milliliters}ml` : null,
   ]
     .filter(Boolean)
     .join(' · ')
 }
 
-function label(item: GroceryItem): string {
-  const size = formatSize(item)
-  return `${item.store_detail.name} — ${item.name}${size ? ` (${size})` : ''}`
+function label(option: GroceryItemStorePriceOption): string {
+  const size = formatSize(option)
+  return `${option.storeName} — ${option.name}${size ? ` (${size})` : ''}`
 }
 
 export function GroceryItemCombobox({
-  items,
+  options,
   value,
   onChange,
   allowClear = true,
   placeholder = 'Search grocery items…',
 }: {
-  items: GroceryItem[]
+  options: GroceryItemStorePriceOption[]
   value: string | null
   onChange: (id: string | null) => void
   /** Show the "Not linked" option and ✕ unlink button — set false when this
@@ -35,7 +35,7 @@ export function GroceryItemCombobox({
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const selected = items.find((item) => item.id === value) ?? null
+  const selected = options.find((option) => option.id === value) ?? null
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -50,14 +50,14 @@ export function GroceryItemCombobox({
   const trimmed = query.trim().toLowerCase()
   const matches = (
     trimmed === ''
-      ? items
-      : items.filter((item) =>
-          `${item.store_detail.name} ${item.brand} ${item.name}`.toLowerCase().includes(trimmed),
+      ? options
+      : options.filter((option) =>
+          `${option.storeName} ${option.brand} ${option.name}`.toLowerCase().includes(trimmed),
         )
   ).slice(0, 8)
 
-  function selectItem(item: GroceryItem | null) {
-    onChange(item?.id ?? null)
+  function selectOption(option: GroceryItemStorePriceOption | null) {
+    onChange(option?.id ?? null)
     setQuery('')
     setOpen(false)
   }
@@ -78,7 +78,7 @@ export function GroceryItemCombobox({
       {allowClear && selected && !open && (
         <button
           type="button"
-          onClick={() => selectItem(null)}
+          onClick={() => selectOption(null)}
           title="Unlink"
           className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-700"
         >
@@ -92,22 +92,22 @@ export function GroceryItemCombobox({
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => selectItem(null)}
+                onClick={() => selectOption(null)}
                 className="block w-full px-3 py-1.5 text-left text-slate-400 hover:bg-slate-100"
               >
                 Not linked
               </button>
             </li>
           )}
-          {matches.map((item) => (
-            <li key={item.id}>
+          {matches.map((option) => (
+            <li key={option.id}>
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => selectItem(item)}
+                onClick={() => selectOption(option)}
                 className="block w-full px-3 py-1.5 text-left hover:bg-slate-100"
               >
-                {label(item)}
+                {label(option)}
               </button>
             </li>
           ))}

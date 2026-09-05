@@ -4,21 +4,20 @@ import {
   AISLE_OPTIONS,
   ApiError,
   type GroceryItemInput,
+  type GroceryItemStorePriceInput,
   type Store,
   fetchStores,
   refreshGroceryItemPrice,
 } from '../api/client'
 
 const EMPTY: GroceryItemInput = {
-  store: '',
   name: '',
   brand: '',
   aisle: '',
   grams: null,
   pieces: null,
   milliliters: null,
-  price: '',
-  product_url: '',
+  store_prices: [],
   trolley_url: '',
   image_url: '',
 }
@@ -57,6 +56,28 @@ export function GroceryItemForm({
     setValues((prev) => ({ ...prev, [key]: value }))
   }
 
+  function addStorePrice(storeId: string) {
+    set('store_prices', [...values.store_prices, { store: storeId, price: null, product_url: '' }])
+  }
+
+  function updateStorePrice(storeId: string, patch: Partial<GroceryItemStorePriceInput>) {
+    set(
+      'store_prices',
+      values.store_prices.map((sp) => (sp.store === storeId ? { ...sp, ...patch } : sp)),
+    )
+  }
+
+  function removeStorePrice(storeId: string) {
+    set(
+      'store_prices',
+      values.store_prices.filter((sp) => sp.store !== storeId),
+    )
+  }
+
+  const availableStores = stores.filter(
+    (store) => !values.store_prices.some((sp) => sp.store === store.id),
+  )
+
   async function handleRefreshPrice() {
     setRefreshMessage(null)
     if (!itemId) return
@@ -69,15 +90,26 @@ export function GroceryItemForm({
     try {
       const updated = await refreshGroceryItemPrice(itemId, values.trolley_url)
       set('trolley_url', updated.trolley_url)
-      set('price', updated.price ?? '')
-      setRefreshMessage({ kind: 'notice', text: `Price refreshed: £${updated.price}` })
+      set(
+        'store_prices',
+        updated.store_prices.map((sp) => ({
+          store: sp.store,
+          price: sp.price,
+          product_url: sp.product_url,
+        })),
+      )
+      const notes = [`Refreshed ${updated.store_prices.length} store price(s).`]
+      if (updated.unmatched_stores.length > 0) {
+        notes.push(`Not on the known store list: ${updated.unmatched_stores.join(', ')}.`)
+      }
+      setRefreshMessage({ kind: 'notice', text: notes.join(' ') })
     } catch (err) {
       setRefreshMessage({
         kind: 'error',
         text:
           err instanceof ApiError
             ? Object.values(err.fieldErrors).flat().join(' ')
-            : 'Could not refresh the price from trolley.co.uk.',
+            : 'Could not refresh prices from trolley.co.uk.',
       })
     } finally {
       setRefreshingPrice(false)
@@ -89,7 +121,13 @@ export function GroceryItemForm({
     setErrors([])
     setSubmitting(true)
     try {
-      await onSubmit({ ...values, price: values.price?.trim() || null })
+      await onSubmit({
+        ...values,
+        store_prices: values.store_prices.map((sp) => ({
+          ...sp,
+          price: sp.price?.toString().trim() || null,
+        })),
+      })
     } catch (err) {
       setErrors(
         err instanceof ApiError
@@ -113,17 +151,6 @@ export function GroceryItemForm({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="col-span-2 space-y-1 text-sm">
-          <span className="font-medium text-slate-700">Product URL</span>
-          <input
-            type="url"
-            placeholder="https://…"
-            value={values.product_url}
-            onChange={(e) => set('product_url', e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-          />
-        </div>
-
-        <div className="col-span-2 space-y-1 text-sm">
           <span className="font-medium text-slate-700">Trolley URL</span>
           <div className="flex gap-2">
             <input
@@ -140,12 +167,13 @@ export function GroceryItemForm({
                 disabled={refreshingPrice}
                 className="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
               >
-                {refreshingPrice ? 'Refreshing…' : 'Refresh price'}
+                {refreshingPrice ? 'Refreshing…' : 'Refresh prices'}
               </button>
             )}
           </div>
           <p className="text-[11px] text-slate-400">
-            A trolley.co.uk product page — lets the price be pulled in automatically.
+            A trolley.co.uk product page — lets every store's price below be pulled in
+            automatically.
           </p>
           {refreshMessage && (
             <p
@@ -158,24 +186,6 @@ export function GroceryItemForm({
           )}
         </div>
 
-        <label className="space-y-1 text-sm">
-          <span className="font-medium text-slate-700">Store</span>
-          <select
-            required
-            value={values.store}
-            onChange={(e) => set('store', e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-          >
-            <option value="" disabled>
-              Select a store…
-            </option>
-            {stores.map((store) => (
-              <option key={store.id} value={store.id}>
-                {store.name}
-              </option>
-            ))}
-          </select>
-        </label>
         <Field label="Name" required value={values.name} onChange={(v) => set('name', v)} />
         <Field label="Brand" value={values.brand} onChange={(v) => set('brand', v)} />
         <label className="space-y-1 text-sm">
@@ -229,12 +239,6 @@ export function GroceryItemForm({
           />
           <p className="text-[11px] text-slate-400">Provide grams, pieces, and/or milliliters</p>
         </div>
-        <Field
-          label="Price"
-          placeholder="e.g. 2.20"
-          value={values.price ?? ''}
-          onChange={(v) => set('price', v)}
-        />
         <div className="col-span-2 flex items-end gap-3">
           <div className="flex-1">
             <Field
@@ -253,6 +257,64 @@ export function GroceryItemForm({
             />
           )}
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <span className="text-sm font-medium text-slate-700">Store prices</span>
+        <div className="space-y-2">
+          {values.store_prices.map((sp) => {
+            const store = stores.find((s) => s.id === sp.store)
+            return (
+              <div
+                key={sp.store}
+                className="flex flex-wrap items-center gap-2 rounded-md border border-slate-100 p-2"
+              >
+                <span className="min-w-[6rem] flex-1 text-sm font-medium text-slate-700">
+                  {store?.name ?? 'Unknown store'}
+                </span>
+                <input
+                  type="text"
+                  placeholder="Price, e.g. 2.20"
+                  value={sp.price ?? ''}
+                  onChange={(e) => updateStorePrice(sp.store, { price: e.target.value })}
+                  className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <input
+                  type="url"
+                  placeholder="Product URL"
+                  value={sp.product_url}
+                  onChange={(e) => updateStorePrice(sp.store, { product_url: e.target.value })}
+                  className="min-w-[10rem] flex-[2] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeStorePrice(sp.store)}
+                  title="Remove"
+                  aria-label={`Remove ${store?.name ?? 'store'} price`}
+                  className="shrink-0 text-red-500 hover:text-red-700"
+                >
+                  ✕
+                </button>
+              </div>
+            )
+          })}
+        </div>
+        {availableStores.length > 0 && (
+          <select
+            value=""
+            onChange={(e) => {
+              if (e.target.value) addStorePrice(e.target.value)
+            }}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-500 focus:border-slate-500 focus:outline-none"
+          >
+            <option value="">+ Add a store price…</option>
+            {availableStores.map((store) => (
+              <option key={store.id} value={store.id}>
+                {store.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="flex gap-2">

@@ -7,7 +7,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import GroceryItem, Store, is_trolley_url
+from .models import GroceryItem, GroceryItemPrice, Store, is_trolley_url
 from .serializers import (
     GroceryItemSerializer,
     RefreshPriceRequestSerializer,
@@ -21,7 +21,7 @@ SCRAPE_USER_AGENT = (
 
 # Bounds a trolley.co.uk page down to just its per-store comparison table —
 # from its opening tag to the next top-level </section> (holds true across
-# every product page checked; see _scrape_trolley_price for why this
+# every product page checked; see _scrape_trolley_prices for why this
 # scoping matters).
 COMPARISON_TABLE_RE = re.compile(r'class="comparison-table".*?</section>', re.DOTALL)
 
@@ -43,26 +43,28 @@ def _normalize_store_name(name):
     return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
-def _scrape_trolley_price(trolley_url, store_name):
-    """Fetch the current price for `store_name` from its trolley.co.uk page.
+def _scrape_trolley_prices(trolley_url):
+    """Fetch every store's current price for a product from its trolley.co.uk
+    page.
 
     trolley.co.uk price-compares one product across several supermarkets on
     a single page. Its schema.org Product/Offer JSON-LD block — which looked
     like the obvious thing to parse — only ever gives the single CHEAPEST
-    price across every store listed, not the price at the specific store a
-    GroceryItem is pinned to: confirmed by hand against
+    price across every store listed, not each store's own price: confirmed
+    by hand against
     https://www.trolley.co.uk/product/loyd-grossman-tikka-masala-sauce/XVR292,
     where the JSON-LD price (£2.84, Asda/Amazon) differs from Tesco's own row
-    on that same page (£3.00). Using it here would risk silently overwriting
-    an item's price with a different store's price entirely.
+    on that same page (£3.00).
 
     So instead this walks the page's own per-store comparison table (each
-    row: a store logo/title plus that store's price) and returns the one row
-    matching `store_name`, ignoring the rest.
+    row: a store logo/title plus that store's price) and returns every row
+    found there, for the caller to match against the app's own Store list
+    and upsert a GroceryItemPrice per match (see GroceryItemViewSet.refresh_price).
 
-    Returns (price, error): exactly one is None. `price` is a decimal
-    string, e.g. "0.85". `error` is a (response_body, http_status) pair
-    ready to hand straight to Response(*error).
+    Returns (rows, error): exactly one is None. `rows` is a list of
+    (store_name, price) tuples, price as a decimal string e.g. "0.85".
+    `error` is a (response_body, http_status) pair ready to hand straight to
+    Response(*error).
     """
     if not is_trolley_url(trolley_url):
         return None, (
@@ -90,15 +92,11 @@ def _scrape_trolley_price(trolley_url, store_name):
             status.HTTP_502_BAD_GATEWAY,
         )
 
-    target = _normalize_store_name(store_name)
-    for row_store, price in STORE_ROW_RE.findall(table_match.group(0)):
-        if _normalize_store_name(row_store) == target:
-            return price.replace(",", ""), None
-
-    return None, (
-        {"detail": f"trolley.co.uk doesn't list a {store_name} price for this product."},
-        status.HTTP_404_NOT_FOUND,
-    )
+    rows = [
+        (row_store, price.replace(",", ""))
+        for row_store, price in STORE_ROW_RE.findall(table_match.group(0))
+    ]
+    return rows, None
 
 
 class StoreViewSet(viewsets.ReadOnlyModelViewSet):
@@ -132,13 +130,22 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="refresh-price")
     def refresh_price(self, request, pk=None):
-        """Re-fetch this item's price from trolley.co.uk and save it.
+        """Re-fetch this item's prices from trolley.co.uk and save them.
 
         Accepts an optional `trolley_url` in the body so the form can refresh
         against a URL that's only just been typed in, without requiring a
         separate save first — when given, it's saved onto the item alongside
-        the refreshed price; otherwise the item's already-stored trolley_url
+        the refreshed prices; otherwise the item's already-stored trolley_url
         is used.
+
+        trolley.co.uk compares this product across every store it lists, so
+        every row is used: each one that matches a known Store gets its
+        GroceryItemPrice updated (or created, if this item wasn't priced at
+        that store before) — existing prices for stores trolley.co.uk didn't
+        mention this time are left untouched rather than cleared, since
+        their absence from this particular page isn't evidence they're
+        wrong. Rows that don't match any known Store are reported back but
+        otherwise ignored.
 
         Open to any signed-in user — it's a plain GET of a URL, same as
         editing the item by hand.
@@ -150,12 +157,23 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
         if not trolley_url:
             raise ValidationError({"trolley_url": ["This item has no trolley.co.uk URL set."]})
 
-        price, error = _scrape_trolley_price(trolley_url, item.store.name)
+        rows, error = _scrape_trolley_prices(trolley_url)
         if error:
             body, error_status = error
             return Response(body, status=error_status)
 
+        stores_by_normalized_name = {_normalize_store_name(s.name): s for s in Store.objects.all()}
+        unmatched_stores = []
+        for row_store, price in rows:
+            store = stores_by_normalized_name.get(_normalize_store_name(row_store))
+            if store is None:
+                unmatched_stores.append(row_store)
+                continue
+            GroceryItemPrice.objects.update_or_create(
+                grocery_item=item, store=store, defaults={"price": price}
+            )
+
         item.trolley_url = trolley_url
-        item.price = price
-        item.save(update_fields=["trolley_url", "price", "updated_at"])
-        return Response(GroceryItemSerializer(item, context={"request": request}).data)
+        item.save(update_fields=["trolley_url", "updated_at"])
+        data = GroceryItemSerializer(item, context={"request": request}).data
+        return Response({**data, "unmatched_stores": unmatched_stores})

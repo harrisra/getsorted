@@ -116,18 +116,20 @@ class RecipeIngredient(models.Model):
 
 class RecipeIngredientStoreOption(models.Model):
     """One (ingredient, store) match: this RecipeIngredient can be bought as
-    the linked GroceryItem at grocery_item.store. At most one match per
-    store per ingredient — enforced by unique_together on `store`, which is
-    denormalized from grocery_item.store purely to get a real DB constraint
-    (kept in sync in save()).
+    the linked GroceryItemPrice's product, at that price row's store. At most
+    one match per store per ingredient — enforced by unique_together on
+    `store`, which is denormalized from grocery_item_price.store purely to
+    get a real DB constraint (kept in sync in save()); a store, not a
+    product, is what's unique per ingredient, since a GroceryItem can now be
+    priced at several stores at once (see catalog.GroceryItemPrice).
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     recipe_ingredient = models.ForeignKey(
         RecipeIngredient, on_delete=models.CASCADE, related_name="store_options"
     )
-    grocery_item = models.ForeignKey(
-        "catalog.GroceryItem", on_delete=models.CASCADE, related_name="recipe_ingredient_options"
+    grocery_item_price = models.ForeignKey(
+        "catalog.GroceryItemPrice", on_delete=models.CASCADE, related_name="recipe_ingredient_options"
     )
     store = models.ForeignKey("catalog.Store", on_delete=models.CASCADE, editable=False)
 
@@ -135,30 +137,31 @@ class RecipeIngredientStoreOption(models.Model):
         unique_together = ("recipe_ingredient", "store")
 
     def save(self, *args, **kwargs):
-        self.store_id = self.grocery_item.store_id
+        self.store_id = self.grocery_item_price.store_id
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.recipe_ingredient.name} @ {self.store.name}: {self.grocery_item.name}"
+        return f"{self.recipe_ingredient.name} @ {self.store.name}: {self.grocery_item_price.grocery_item.name}"
 
     @property
     def line_cost(self):
-        """This match's share of the grocery item's price, scaled by
-        whichever unit (grams/milliliters/pieces) both the ingredient and
-        the item have in common — e.g. needing 250g of a 500g, £2 pack costs
-        £1. None if there's no price, or no shared unit to scale by (rather
+        """This match's share of the store price's cost, scaled by whichever
+        unit (grams/milliliters/pieces) both the ingredient and the item
+        have in common — e.g. needing 250g of a 500g, £2 pack costs £1.
+        None if there's no price, or no shared unit to scale by (rather
         than guessing, or falling back to the item's full price, which
         would silently overstate the cost).
         """
-        item = self.grocery_item
+        price_row = self.grocery_item_price
+        item = price_row.grocery_item
         ingredient = self.recipe_ingredient
-        if item.price is None:
+        if price_row.price is None:
             return None
         for dimension in ("grams", "milliliters", "pieces"):
             item_amount = getattr(item, dimension)
             ingredient_amount = getattr(ingredient, dimension)
             if item_amount and ingredient_amount is not None:
-                cost = item.price * (Decimal(ingredient_amount) / Decimal(item_amount))
+                cost = price_row.price * (Decimal(ingredient_amount) / Decimal(item_amount))
                 return cost.quantize(Decimal("0.01"))
         return None
 
@@ -242,12 +245,12 @@ class ShoppingListItem(models.Model):
     grams = models.PositiveIntegerField(null=True, blank=True)
     pieces = models.PositiveIntegerField(null=True, blank=True)
     milliliters = models.PositiveIntegerField(null=True, blank=True)
-    # Which specific catalog product (and so which store) to buy this item
-    # as — picked from whichever GroceryItems name-match `name`, defaulting
-    # to the cheapest. Optional: not every item corresponds to something in
-    # the catalog (e.g. "Birthday candles").
-    grocery_item = models.ForeignKey(
-        "catalog.GroceryItem",
+    # Which specific catalog product, at which store, to buy this item as —
+    # picked from whichever GroceryItems name-match `name`, defaulting to the
+    # cheapest of their store prices. Optional: not every item corresponds to
+    # something in the catalog (e.g. "Birthday candles").
+    grocery_item_price = models.ForeignKey(
+        "catalog.GroceryItemPrice",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -271,9 +274,9 @@ class ShoppingListItem(models.Model):
         needed, rounded up (e.g. needing 500g from a 200g pack means 3).
         None if there's no matched item, no needed-amount data, or no unit
         (grams/milliliters/pieces) shared between the two to compare."""
-        item = self.grocery_item
-        if not item:
+        if not self.grocery_item_price:
             return None
+        item = self.grocery_item_price.grocery_item
         for dimension in ("grams", "milliliters", "pieces"):
             item_amount = getattr(item, dimension)
             needed_amount = getattr(self, dimension)

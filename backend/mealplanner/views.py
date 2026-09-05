@@ -46,8 +46,9 @@ class RecipeViewSet(HouseholdScopedViewSet):
     queryset = Recipe.objects.prefetch_related(
         "ingredients",
         "ingredients__store_options",
-        "ingredients__store_options__grocery_item",
-        "ingredients__store_options__grocery_item__store",
+        "ingredients__store_options__grocery_item_price",
+        "ingredients__store_options__grocery_item_price__store",
+        "ingredients__store_options__grocery_item_price__grocery_item",
     ).all()
     serializer_class = RecipeSerializer
 
@@ -113,7 +114,7 @@ class MealPlanViewSet(HouseholdScopedViewSet):
         "slots__recipes",
         "slots__recipes__ingredients",
         "slots__recipes__ingredients__store_options",
-        "slots__recipes__ingredients__store_options__grocery_item",
+        "slots__recipes__ingredients__store_options__grocery_item_price",
     )
     serializer_class = MealPlanSerializer
 
@@ -162,14 +163,14 @@ class MealSlotViewSet(HouseholdScopedViewSet):
         "recipes",
         "recipes__ingredients",
         "recipes__ingredients__store_options",
-        "recipes__ingredients__store_options__grocery_item",
+        "recipes__ingredients__store_options__grocery_item_price",
     )
     serializer_class = MealSlotSerializer
     household_lookup = "meal_plan__household__members"
 
 
 def add_or_merge_shopping_list_item(
-    shopping_list, name, grams, pieces, milliliters, meal_plan_id, user, grocery_item=None
+    shopping_list, name, grams, pieces, milliliters, meal_plan_id, user, grocery_item_price=None
 ):
     """Add (name, amount) to a shopping list, merging into an existing item
     of the same name (case/whitespace-insensitive) rather than creating a
@@ -201,7 +202,7 @@ def add_or_merge_shopping_list_item(
         grams=grams,
         pieces=pieces,
         milliliters=milliliters,
-        grocery_item=grocery_item,
+        grocery_item_price=grocery_item_price,
         added_by=user,
     )
     return item, True
@@ -240,7 +241,7 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
         slots = MealSlot.objects.filter(
             meal_plan__household=shopping_list.household, date__in=parsed_dates
         ).prefetch_related(
-            "recipes__ingredients__store_options__grocery_item",
+            "recipes__ingredients__store_options__grocery_item_price",
         )
 
         # Normalized ingredient name -> [(ingredient, meal_plan_id), ...]
@@ -277,8 +278,8 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
                 for option in ingredient.store_options.all()
                 if option.line_cost is not None
             ]
-            grocery_item = (
-                min(priced_options, key=lambda option: option.line_cost).grocery_item
+            grocery_item_price = (
+                min(priced_options, key=lambda option: option.line_cost).grocery_item_price
                 if priced_options
                 else None
             )
@@ -291,7 +292,7 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
                 milliliters,
                 meal_plan_id,
                 request.user,
-                grocery_item=grocery_item,
+                grocery_item_price=grocery_item_price,
             )
             affected.append(item)
 
@@ -300,7 +301,9 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
 
 
 class ShoppingListItemViewSet(HouseholdScopedViewSet):
-    queryset = ShoppingListItem.objects.select_related("grocery_item", "grocery_item__store")
+    queryset = ShoppingListItem.objects.select_related(
+        "grocery_item_price", "grocery_item_price__store", "grocery_item_price__grocery_item"
+    )
     serializer_class = ShoppingListItemSerializer
     household_lookup = "shopping_list__household__members"
 
@@ -323,7 +326,7 @@ class ShoppingListItemViewSet(HouseholdScopedViewSet):
             milliliters=data.get("milliliters"),
             meal_plan_id=meal_plan.id if meal_plan else None,
             user=request.user,
-            grocery_item=data.get("grocery_item"),
+            grocery_item_price=data.get("grocery_item_price"),
         )
         out_serializer = self.get_serializer(item)
         return Response(

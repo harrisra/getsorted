@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import {
   AISLE_OPTIONS,
   ApiError,
-  type GroceryItem,
+  type GroceryItemStorePriceOption,
   type ShoppingList,
   type ShoppingListItem,
   type Store,
@@ -12,6 +12,7 @@ import {
   fetchGroceryItems,
   fetchShoppingListItems,
   fetchStores,
+  flattenGroceryItemPrices,
   generateShoppingList,
   renameShoppingList,
   updateShoppingListItem,
@@ -20,15 +21,18 @@ import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { PencilIcon } from '../icons'
 import { addDays, formatDateISO, formatDayHeading } from '../mealplanner/dates'
 
-// Catalog items whose name mentions this shopping-list item's name (e.g.
-// "Cheddar" matches "Tesco Mature Cheddar Block 400g"), cheapest first —
-// priced items before unpriced ones, since there's nothing to compare an
-// unpriced item on.
-function matchingGroceryItems(itemName: string, groceryItems: GroceryItem[]): GroceryItem[] {
+// Catalog (item, store) prices whose name mentions this shopping-list
+// item's name (e.g. "Cheddar" matches "Tesco Mature Cheddar Block 400g"),
+// cheapest first — priced options before unpriced ones, since there's
+// nothing to compare an unpriced one on.
+function matchingGroceryItemOptions(
+  itemName: string,
+  options: GroceryItemStorePriceOption[],
+): GroceryItemStorePriceOption[] {
   const needle = itemName.trim().toLowerCase()
   if (!needle) return []
-  return groceryItems
-    .filter((gi) => gi.name.toLowerCase().includes(needle))
+  return options
+    .filter((option) => option.name.toLowerCase().includes(needle))
     .sort((a, b) => {
       if (a.price == null && b.price == null) return 0
       if (a.price == null) return 1
@@ -67,11 +71,11 @@ function escapeHtml(value: string): string {
 // selected match is the cheapest priced option available, pale red when a
 // cheaper one exists instead. Neutral (default) when there's nothing to
 // compare — a single match, or no priced matches at all.
-function selectPriceClasses(matches: GroceryItem[], selectedId: string): string {
-  const priced = matches.filter((gi) => gi.price != null)
+function selectPriceClasses(matches: GroceryItemStorePriceOption[], selectedId: string): string {
+  const priced = matches.filter((option) => option.price != null)
   if (priced.length < 2) return 'border-slate-300'
-  const cheapest = Math.min(...priced.map((gi) => Number(gi.price)))
-  const selected = matches.find((gi) => gi.id === selectedId)
+  const cheapest = Math.min(...priced.map((option) => Number(option.price)))
+  const selected = matches.find((option) => option.id === selectedId)
   if (selected?.price == null) return 'border-slate-300'
   return Number(selected.price) <= cheapest
     ? 'border-green-300 bg-green-50'
@@ -82,7 +86,7 @@ function selectPriceClasses(matches: GroceryItem[], selectedId: string): string 
 // packs_needed times the pack price. Null unless both are known (i.e. a
 // grocery item is actually matched and priced).
 function rowCost(item: ShoppingListItem): number | null {
-  const price = item.grocery_item_detail?.price
+  const price = item.grocery_item_price_detail?.price
   if (item.packs_needed == null || price == null) return null
   return Number(price) * item.packs_needed
 }
@@ -103,8 +107,8 @@ const SORT_MODE_LABELS: Record<SortMode, string> = {
 
 interface EnrichedItem {
   item: ShoppingListItem
-  matches: GroceryItem[]
-  effectiveGroceryItemId: string
+  matches: GroceryItemStorePriceOption[]
+  effectiveGroceryItemPriceId: string
   // The store (and aisle) of whichever product this item would actually be
   // bought as — its saved match, or (nothing chosen yet) the same
   // default-to-cheapest match shown in the dropdown. Used for the "grouped
@@ -115,15 +119,18 @@ interface EnrichedItem {
   effectiveAisleLabel: string | null
 }
 
-function enrichItems(items: ShoppingListItem[], groceryItems: GroceryItem[]): EnrichedItem[] {
+function enrichItems(
+  items: ShoppingListItem[],
+  groceryItemOptions: GroceryItemStorePriceOption[],
+): EnrichedItem[] {
   return items.map((item) => {
-    const matches = matchingGroceryItems(item.name, groceryItems)
-    const effective = matches.find((gi) => gi.id === item.grocery_item) ?? matches[0]
+    const matches = matchingGroceryItemOptions(item.name, groceryItemOptions)
+    const effective = matches.find((option) => option.id === item.grocery_item_price) ?? matches[0]
     return {
       item,
       matches,
-      effectiveGroceryItemId: item.grocery_item ?? (matches[0]?.id ?? ''),
-      effectiveStore: effective?.store_detail.name ?? null,
+      effectiveGroceryItemPriceId: item.grocery_item_price ?? (matches[0]?.id ?? ''),
+      effectiveStore: effective?.storeName ?? null,
       effectiveAisleLabel: AISLE_OPTIONS.find((a) => a.value === effective?.aisle)?.label ?? null,
     }
   })
@@ -190,7 +197,7 @@ export function ShoppingListDetailView({
   onRenamed: (list: ShoppingList) => void
 }) {
   const [items, setItems] = useState<ShoppingListItem[] | null>(null)
-  const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([])
+  const [groceryItemOptions, setGroceryItemOptions] = useState<GroceryItemStorePriceOption[]>([])
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set())
   const [generating, setGenerating] = useState(false)
   const [generateMessage, setGenerateMessage] = useState<string | null>(null)
@@ -217,7 +224,7 @@ export function ShoppingListDetailView({
 
   useEffect(() => {
     refresh()
-    fetchGroceryItems().then(setGroceryItems)
+    fetchGroceryItems().then((items) => setGroceryItemOptions(flattenGroceryItemPrices(items)))
     fetchStores().then(setStores)
   }, [])
 
@@ -226,17 +233,19 @@ export function ShoppingListDetailView({
   // price) — items with no match/no price simply don't contribute, rather
   // than treating "unknown" as £0.
   const totalCost = visibleItems?.reduce((sum, item) => sum + (rowCost(item) ?? 0), 0) ?? 0
-  const sortedItems = visibleItems ? sortEnriched(enrichItems(visibleItems, groceryItems), sortMode) : null
+  const sortedItems = visibleItems
+    ? sortEnriched(enrichItems(visibleItems, groceryItemOptions), sortMode)
+    : null
 
-  // Grocery catalog items shown in the "Add from grocery items" panel —
-  // free-text search over name/brand plus an optional store filter, same
-  // filtering shape as the main grocery items page.
+  // Grocery catalog (item, store) prices shown in the "Add from grocery
+  // items" panel — free-text search over name/brand plus an optional store
+  // filter, same filtering shape as the main grocery items page.
   const trimmedCatalogSearch = catalogSearch.trim().toLowerCase()
-  const catalogResults = groceryItems.filter((gi) => {
-    if (catalogStoreFilter && gi.store !== catalogStoreFilter) return false
+  const catalogResults = groceryItemOptions.filter((option) => {
+    if (catalogStoreFilter && option.store !== catalogStoreFilter) return false
     if (
       trimmedCatalogSearch &&
-      !`${gi.name} ${gi.brand}`.toLowerCase().includes(trimmedCatalogSearch)
+      !`${option.name} ${option.brand}`.toLowerCase().includes(trimmedCatalogSearch)
     ) {
       return false
     }
@@ -314,8 +323,8 @@ export function ShoppingListDetailView({
     await refresh()
   }
 
-  async function handleChangeGroceryItem(itemId: string, groceryItemId: string) {
-    await updateShoppingListItem(itemId, { grocery_item: groceryItemId || null })
+  async function handleChangeGroceryItem(itemId: string, groceryItemPriceId: string) {
+    await updateShoppingListItem(itemId, { grocery_item_price: groceryItemPriceId || null })
     await refresh()
   }
 
@@ -338,7 +347,7 @@ export function ShoppingListDetailView({
         grams: parseAmount(newItemGrams),
         pieces: parseAmount(newItemPieces),
         milliliters: parseAmount(newItemMilliliters),
-        grocery_item: null,
+        grocery_item_price: null,
         is_checked: false,
       })
       setNewItemName('')
@@ -357,9 +366,9 @@ export function ShoppingListDetailView({
     }
   }
 
-  async function handleAddFromCatalog(groceryItem: GroceryItem) {
+  async function handleAddFromCatalog(option: GroceryItemStorePriceOption) {
     setCatalogAddError(null)
-    setAddingCatalogItemId(groceryItem.id)
+    setAddingCatalogItemId(option.id)
     try {
       // Defaults the amount needed to one pack of the item itself (whichever
       // size dimension it has set), so it shows up with packs_needed = 1
@@ -369,11 +378,11 @@ export function ShoppingListDetailView({
       await createShoppingListItem({
         shopping_list: list.id,
         meal_plan: null,
-        name: groceryItem.name,
-        grams: groceryItem.grams,
-        pieces: groceryItem.pieces,
-        milliliters: groceryItem.milliliters,
-        grocery_item: groceryItem.id,
+        name: option.name,
+        grams: option.grams,
+        pieces: option.pieces,
+        milliliters: option.milliliters,
+        grocery_item_price: option.id,
         is_checked: false,
       })
       await refresh()
@@ -588,32 +597,32 @@ export function ShoppingListDetailView({
                     : 'Search for a grocery item to add it.'}
                 </li>
               )}
-              {catalogResults.map((gi) => (
-                <li key={gi.id} className="flex items-center justify-between gap-2 px-3 py-2">
+              {catalogResults.map((option) => (
+                <li key={option.id} className="flex items-center justify-between gap-2 px-3 py-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
-                    {gi.image_url && (
+                    {option.image_url && (
                       <img
-                        src={gi.image_url}
+                        src={option.image_url}
                         alt=""
                         className="h-8 w-8 shrink-0 rounded border border-slate-200 object-cover"
                       />
                     )}
                     <div className="min-w-0">
-                      <p className="truncate text-sm text-slate-800">{gi.name}</p>
-                      {gi.price && <p className="text-xs text-slate-500">£{gi.price}</p>}
+                      <p className="truncate text-sm text-slate-800">{option.name}</p>
+                      {option.price && <p className="text-xs text-slate-500">£{option.price}</p>}
                     </div>
                   </div>
                   {/* Store column, between the item name and the Add button. */}
                   <span className="w-24 shrink-0 truncate text-xs text-slate-500">
-                    {gi.store_detail.name}
+                    {option.storeName}
                   </span>
                   <button
                     type="button"
-                    onClick={() => handleAddFromCatalog(gi)}
-                    disabled={addingCatalogItemId === gi.id}
+                    onClick={() => handleAddFromCatalog(option)}
+                    disabled={addingCatalogItemId === option.id}
                     className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                   >
-                    {addingCatalogItemId === gi.id ? 'Adding…' : 'Add'}
+                    {addingCatalogItemId === option.id ? 'Adding…' : 'Add'}
                   </button>
                 </li>
               ))}
@@ -723,7 +732,7 @@ export function ShoppingListDetailView({
           <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
             {(() => {
           let lastHeading: string | null | undefined
-          return sortedItems?.map(({ item, matches, effectiveGroceryItemId, effectiveStore, effectiveAisleLabel }) => {
+          return sortedItems?.map(({ item, matches, effectiveGroceryItemPriceId, effectiveStore, effectiveAisleLabel }) => {
             // In "grouped by store"/"store + aisle" mode, drop in a heading
             // row each time the group changes — items with no matched
             // product at all fall under a trailing "Unmatched" heading
@@ -767,15 +776,15 @@ export function ShoppingListDetailView({
                     <div className="w-64 shrink-0">
                       {matches.length > 0 && (
                         <select
-                          value={effectiveGroceryItemId}
+                          value={effectiveGroceryItemPriceId}
                           onChange={(e) => handleChangeGroceryItem(item.id, e.target.value)}
                           aria-label={`Choose which product to buy for ${item.name}`}
-                          className={`w-full rounded-md border px-2 py-1 text-xs text-slate-700 focus:border-slate-500 focus:outline-none ${selectPriceClasses(matches, effectiveGroceryItemId)}`}
+                          className={`w-full rounded-md border px-2 py-1 text-xs text-slate-700 focus:border-slate-500 focus:outline-none ${selectPriceClasses(matches, effectiveGroceryItemPriceId)}`}
                         >
-                          {matches.map((gi) => (
-                            <option key={gi.id} value={gi.id}>
-                              {gi.store_detail.name} — {gi.name}
-                              {gi.price ? ` — £${gi.price}` : ''}
+                          {matches.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.storeName} — {option.name}
+                              {option.price ? ` — £${option.price}` : ''}
                             </option>
                           ))}
                         </select>

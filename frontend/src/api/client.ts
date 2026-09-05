@@ -280,10 +280,22 @@ export const AISLE_OPTIONS: { value: Aisle; label: string }[] = [
   { value: 'toiletries_health', label: 'Toiletries & Health' },
 ]
 
-export interface GroceryItem {
+// One store's price for a GroceryItem — a product can be priced at several
+// stores at once, each with its own price and product page URL (moved here
+// from GroceryItem, since it's store-specific).
+export interface GroceryItemStorePrice {
   id: string
   store: string
   store_detail: Store
+  price: string | null
+  product_url: string
+  updated_at: string
+}
+
+export type GroceryItemStorePriceInput = Omit<GroceryItemStorePrice, 'id' | 'store_detail' | 'updated_at'>
+
+export interface GroceryItem {
+  id: string
   name: string
   brand: string
   // Which supermarket aisle this is shelved in — optional, '' means unset.
@@ -291,11 +303,12 @@ export interface GroceryItem {
   grams: number | null
   pieces: number | null
   milliliters: number | null
-  price: string | null
-  product_url: string
+  store_prices: GroceryItemStorePrice[]
   // A trolley.co.uk product page for this item, e.g.
   // https://www.trolley.co.uk/product/tesco-semi-skimmed-milk/MAC224 — optional,
-  // and only used to refresh `price` (see refreshGroceryItemPrice below).
+  // and only used to refresh every store's price at once (see
+  // refreshGroceryItemPrice below) — one URL for the whole product, not per
+  // store, since trolley.co.uk itself compares one product across stores.
   trolley_url: string
   image_url: string
   created_by_email: string | null
@@ -305,8 +318,50 @@ export interface GroceryItem {
 
 export type GroceryItemInput = Omit<
   GroceryItem,
-  'id' | 'store_detail' | 'created_by_email' | 'created_at' | 'updated_at'
->
+  'id' | 'store_prices' | 'created_by_email' | 'created_at' | 'updated_at'
+> & {
+  store_prices: GroceryItemStorePriceInput[]
+}
+
+// One (product, store) combination flattened out of GroceryItem.store_prices
+// — the unit recipes and shopping-list items actually match against, since
+// a product can now be priced at several stores at once. Built with
+// flattenGroceryItemPrices below rather than fetched from its own endpoint.
+export interface GroceryItemStorePriceOption {
+  id: string
+  groceryItemId: string
+  store: string
+  storeName: string
+  name: string
+  brand: string
+  aisle: Aisle | ''
+  grams: number | null
+  pieces: number | null
+  milliliters: number | null
+  price: string | null
+  product_url: string
+  image_url: string
+}
+
+export function flattenGroceryItemPrices(items: GroceryItem[]): GroceryItemStorePriceOption[] {
+  return items.flatMap((item) =>
+    item.store_prices.map((sp) => ({
+      id: sp.id,
+      groceryItemId: item.id,
+      store: sp.store,
+      storeName: sp.store_detail.name,
+      name: item.name,
+      brand: item.brand,
+      aisle: item.aisle,
+      grams: item.grams,
+      pieces: item.pieces,
+      milliliters: item.milliliters,
+      price: sp.price,
+      product_url: sp.product_url,
+      image_url: item.image_url,
+    })),
+  )
+}
 
 export async function fetchStores(): Promise<Store[]> {
   const response = await apiFetch('/api/catalog/stores/')
@@ -341,16 +396,23 @@ export async function deleteGroceryItem(id: string): Promise<void> {
   await apiFetch(`/api/catalog/grocery-items/${id}/`, { method: 'DELETE' })
 }
 
-// Re-fetches the item's price from trolley.co.uk and saves it — only
-// possible for an already-saved item (it's a detail action). `trolleyUrl`
-// is optional: pass the form's current (possibly unsaved) value so this can
-// be used right after typing a new URL in, without saving first — the
-// server saves it onto the item alongside the refreshed price. Omit it to
-// reuse whatever trolley_url the item already has stored.
+export interface RefreshPriceResult extends GroceryItem {
+  /** Store names trolley.co.uk listed that don't match any known Store —
+   * their prices were found but couldn't be saved anywhere. */
+  unmatched_stores: string[]
+}
+
+// Re-fetches every store's price for the item from trolley.co.uk and saves
+// them (updating or creating a GroceryItemStorePrice per matched store) —
+// only possible for an already-saved item (it's a detail action).
+// `trolleyUrl` is optional: pass the form's current (possibly unsaved) value
+// so this can be used right after typing a new URL in, without saving first
+// — the server saves it onto the item alongside the refreshed prices. Omit
+// it to reuse whatever trolley_url the item already has stored.
 export async function refreshGroceryItemPrice(
   id: string,
   trolleyUrl?: string,
-): Promise<GroceryItem> {
+): Promise<RefreshPriceResult> {
   const response = await apiFetch(`/api/catalog/grocery-items/${id}/refresh-price/`, {
     method: 'POST',
     body: JSON.stringify({ trolley_url: trolleyUrl || '' }),
@@ -370,14 +432,14 @@ export interface GroceryItemRef {
 
 export interface RecipeIngredientStoreOption {
   id: string
-  /** The store this match is for (derived server-side from grocery_item). */
+  /** The store this match is for (derived server-side from grocery_item_price). */
   store: string
-  grocery_item: string
-  grocery_item_detail: GroceryItemRef
+  grocery_item_price: string
+  grocery_item_price_detail: GroceryItemRef
   line_cost: string | null
 }
 
-export type RecipeIngredientStoreOptionInput = { grocery_item: string }
+export type RecipeIngredientStoreOptionInput = { grocery_item_price: string }
 
 export interface RecipeIngredient {
   id: string
@@ -577,12 +639,12 @@ export interface ShoppingListItem {
   grams: number | null
   pieces: number | null
   milliliters: number | null
-  /** The specific catalog product (and so store) chosen for this item. */
-  grocery_item: string | null
-  grocery_item_detail: GroceryItemRef | null
-  /** How many of grocery_item's packs to buy to cover the amount needed
-   * (ceiling division), or null if there's no match or no shared unit to
-   * compare against. Server-computed. */
+  /** The specific catalog product+store price chosen for this item. */
+  grocery_item_price: string | null
+  grocery_item_price_detail: GroceryItemRef | null
+  /** How many of grocery_item_price's packs to buy to cover the amount
+   * needed (ceiling division), or null if there's no match or no shared
+   * unit to compare against. Server-computed. */
   packs_needed: number | null
   is_checked: boolean
   added_by: string | null
@@ -592,7 +654,7 @@ export interface ShoppingListItem {
 
 export type ShoppingListItemInput = Omit<
   ShoppingListItem,
-  'id' | 'grocery_item_detail' | 'packs_needed' | 'added_by' | 'added_by_email' | 'created_at'
+  'id' | 'grocery_item_price_detail' | 'packs_needed' | 'added_by' | 'added_by_email' | 'created_at'
 >
 
 export async function fetchShoppingListItems(): Promise<ShoppingListItem[]> {

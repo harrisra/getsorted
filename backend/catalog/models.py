@@ -60,10 +60,15 @@ class GroceryItem(models.Model):
     Unlike other domain data this isn't scoped to a Household — it's a single
     catalog every household can browse and contribute to, e.g. so the same
     "Tesco British Cooked Ham Slices 120g" entry can be reused by anyone.
+
+    Not tied to any one store — see GroceryItemPrice for the (possibly
+    several) stores it's priced at. Size (grams/pieces/milliliters) lives
+    here rather than per-store since the same product is the same size
+    everywhere it's sold; price and each store's own product page URL do
+    vary per store, so those live on GroceryItemPrice instead.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    store = models.ForeignKey(Store, on_delete=models.PROTECT, related_name="grocery_items")
     name = models.CharField(max_length=255)
     brand = models.CharField(max_length=255, blank=True)
     # Which supermarket aisle this is shelved in — optional, so existing/
@@ -74,13 +79,13 @@ class GroceryItem(models.Model):
     grams = models.PositiveIntegerField(null=True, blank=True)
     pieces = models.PositiveIntegerField(null=True, blank=True)
     milliliters = models.PositiveIntegerField(null=True, blank=True)
-    price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
-    product_url = models.URLField(blank=True)
     # A trolley.co.uk product page for this item, e.g.
     # https://www.trolley.co.uk/product/tesco-semi-skimmed-milk/MAC224 — optional,
-    # since not every item has one, but when set it lets the price be refreshed
-    # straight from trolley.co.uk's own price-comparison page (see
-    # GroceryItemViewSet.refresh_price).
+    # since not every item has one, but when set it lets every store's price
+    # be refreshed in one go straight from trolley.co.uk's own price-
+    # comparison page (see GroceryItemViewSet.refresh_price). One URL for the
+    # whole product, not per store, since trolley.co.uk itself compares one
+    # product across every store on a single page.
     trolley_url = models.URLField(blank=True)
     image_url = models.URLField(blank=True)
     created_by = models.ForeignKey(
@@ -90,7 +95,35 @@ class GroceryItem(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["store__name", "name"]
+        ordering = ["name"]
 
     def __str__(self):
-        return f"{self.store.name} — {self.name}"
+        return self.name
+
+
+class GroceryItemPrice(models.Model):
+    """One store's price for a GroceryItem — a product can be priced at
+    several stores at once (e.g. cheddar at both Tesco and Aldi), each with
+    its own price and product page URL, rather than needing a duplicate
+    GroceryItem per store.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    grocery_item = models.ForeignKey(
+        GroceryItem, on_delete=models.CASCADE, related_name="store_prices"
+    )
+    store = models.ForeignKey(Store, on_delete=models.PROTECT, related_name="grocery_item_prices")
+    price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    # This store's own product page for the item — moved here from
+    # GroceryItem since it's store-specific (unlike trolley_url above, which
+    # compares across stores and so stays on GroceryItem itself).
+    product_url = models.URLField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["store__name"]
+        unique_together = ("grocery_item", "store")
+
+    def __str__(self):
+        return f"{self.grocery_item.name} @ {self.store.name}"

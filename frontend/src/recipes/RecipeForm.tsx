@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   ApiError,
-  type GroceryItem,
+  type GroceryItemStorePriceOption,
   type MealType,
   type RecipeIngredientInput,
   type RecipeInput,
   fetchGroceryItems,
+  flattenGroceryItemPrices,
 } from '../api/client'
 import { TrashIcon } from '../icons'
 import { GroceryItemCombobox } from './GroceryItemCombobox'
@@ -16,13 +17,13 @@ type IngredientQuantity = Pick<RecipeIngredientInput, 'grams' | 'pieces' | 'mill
 
 // Mirrors the backend's RecipeIngredientStoreOption.line_cost exactly, so a
 // just-added match shows its cost immediately rather than only after
-// saving: the matched item's price, scaled by whichever unit
+// saving: the matched store price, scaled by whichever unit
 // (grams/milliliters/pieces) both the ingredient and the item share.
-function lineCost(item: GroceryItem, ingredient: IngredientQuantity): number | null {
-  if (item.price == null) return null
-  const price = Number(item.price)
+function lineCost(option: GroceryItemStorePriceOption, ingredient: IngredientQuantity): number | null {
+  if (option.price == null) return null
+  const price = Number(option.price)
   for (const dimension of ['grams', 'milliliters', 'pieces'] as const) {
-    const itemAmount = item[dimension]
+    const itemAmount = option[dimension]
     const ingredientAmount = ingredient[dimension]
     if (itemAmount && ingredientAmount != null) {
       return Math.round(price * (ingredientAmount / itemAmount) * 100) / 100
@@ -66,7 +67,7 @@ export function RecipeForm({
   onCancel?: () => void
 }) {
   const [values, setValues] = useState<RecipeFormValues>(initialValue ?? EMPTY)
-  const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([])
+  const [groceryItemOptions, setGroceryItemOptions] = useState<GroceryItemStorePriceOption[]>([])
   const [errors, setErrors] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -80,7 +81,7 @@ export function RecipeForm({
   const [imageUrlEdited, setImageUrlEdited] = useState(false)
 
   useEffect(() => {
-    fetchGroceryItems().then(setGroceryItems)
+    fetchGroceryItems().then((items) => setGroceryItemOptions(flattenGroceryItemPrices(items)))
   }, [])
 
   useEffect(() => {
@@ -118,29 +119,31 @@ export function RecipeForm({
     )
   }
 
-  function addStoreOption(index: number, groceryItemId: string) {
+  function addStoreOption(index: number, groceryItemPriceId: string) {
     const ingredient = values.ingredients[index]
     updateIngredient(index, {
-      store_options: [...ingredient.store_options, { grocery_item: groceryItemId }],
+      store_options: [...ingredient.store_options, { grocery_item_price: groceryItemPriceId }],
     })
   }
 
-  function removeStoreOption(index: number, groceryItemId: string) {
+  function removeStoreOption(index: number, groceryItemPriceId: string) {
     const ingredient = values.ingredients[index]
     updateIngredient(index, {
-      store_options: ingredient.store_options.filter((opt) => opt.grocery_item !== groceryItemId),
+      store_options: ingredient.store_options.filter(
+        (opt) => opt.grocery_item_price !== groceryItemPriceId,
+      ),
     })
   }
 
-  // Grocery items from stores this ingredient is already matched to, so the
+  // Options from stores this ingredient is already matched to, so the
   // "add a match" combobox can't offer a second item from the same store —
   // only one match per store is allowed per ingredient.
-  function availableGroceryItems(ingredient: RecipeIngredientInput) {
-    const matchedItems = groceryItems.filter((gi) =>
-      ingredient.store_options.some((opt) => opt.grocery_item === gi.id),
+  function availableGroceryItemOptions(ingredient: RecipeIngredientInput) {
+    const matchedOptions = groceryItemOptions.filter((option) =>
+      ingredient.store_options.some((opt) => opt.grocery_item_price === option.id),
     )
-    const usedStoreIds = new Set(matchedItems.map((gi) => gi.store))
-    return groceryItems.filter((gi) => !usedStoreIds.has(gi.store))
+    const usedStoreIds = new Set(matchedOptions.map((option) => option.store))
+    return groceryItemOptions.filter((option) => !usedStoreIds.has(option.store))
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -379,19 +382,19 @@ export function RecipeForm({
               <div className="space-y-1 pl-4">
                 <span className="text-xs font-medium text-slate-500">Store matches</span>
                 {ingredient.store_options.map((option) => {
-                  const item = groceryItems.find((gi) => gi.id === option.grocery_item)
-                  const cost = item ? lineCost(item, ingredient) : null
+                  const priceOption = groceryItemOptions.find((o) => o.id === option.grocery_item_price)
+                  const cost = priceOption ? lineCost(priceOption, ingredient) : null
                   return (
                     <div
-                      key={option.grocery_item}
+                      key={option.grocery_item_price}
                       className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2 py-1 text-xs"
                     >
                       <span className="min-w-0 truncate text-slate-700">
-                        {item ? (
+                        {priceOption ? (
                           <>
-                            <span className="font-medium">{item.store_detail.name}</span>
+                            <span className="font-medium">{priceOption.storeName}</span>
                             {' — '}
-                            {item.name}
+                            {priceOption.name}
                           </>
                         ) : (
                           'Unknown item'
@@ -403,7 +406,7 @@ export function RecipeForm({
                         </span>
                         <button
                           type="button"
-                          onClick={() => removeStoreOption(index, option.grocery_item)}
+                          onClick={() => removeStoreOption(index, option.grocery_item_price)}
                           title="Remove match"
                           aria-label="Remove match"
                           className="text-slate-400 hover:text-red-600"
@@ -415,7 +418,7 @@ export function RecipeForm({
                   )
                 })}
                 <GroceryItemCombobox
-                  items={availableGroceryItems(ingredient)}
+                  options={availableGroceryItemOptions(ingredient)}
                   value={null}
                   onChange={(id) => {
                     if (id) addStoreOption(index, id)

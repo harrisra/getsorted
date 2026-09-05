@@ -1,34 +1,41 @@
 import { AISLE_OPTIONS, type Aisle, type GroceryItem, type GroceryItemInput, type Store } from '../api/client'
 
-// The portable shape used for export/import files. Store is the chain's
-// NAME rather than its internal id — the id is only meaningful within this
-// deployment's catalog, whereas the name can be resolved back to whichever
-// Store row it matches on import (see toGroceryItemInput below).
-export interface ExportedGroceryItem {
+// The portable shape used for export/import files. Each store price's store
+// is the chain's NAME rather than its internal id — the id is only
+// meaningful within this deployment's catalog, whereas the name can be
+// resolved back to whichever Store row it matches on import (see
+// toGroceryItemInput below).
+export interface ExportedGroceryItemPrice {
   store: string
+  price: string | null
+  product_url: string
+}
+
+export interface ExportedGroceryItem {
   name: string
   brand: string
   aisle: Aisle | ''
   grams: number | null
   pieces: number | null
   milliliters: number | null
-  price: string | null
-  product_url: string
+  store_prices: ExportedGroceryItemPrice[]
   trolley_url: string
   image_url: string
 }
 
 function toExportedGroceryItem(item: GroceryItem): ExportedGroceryItem {
   return {
-    store: item.store_detail.name,
     name: item.name,
     brand: item.brand,
     aisle: item.aisle,
     grams: item.grams,
     pieces: item.pieces,
     milliliters: item.milliliters,
-    price: item.price,
-    product_url: item.product_url,
+    store_prices: item.store_prices.map((sp) => ({
+      store: sp.store_detail.name,
+      price: sp.price,
+      product_url: sp.product_url,
+    })),
     trolley_url: item.trolley_url,
     image_url: item.image_url,
   }
@@ -64,14 +71,30 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function toStorePriceInput(
+  entry: unknown,
+  stores: Store[],
+): GroceryItemInput['store_prices'][number] | null {
+  if (!isPlainRecord(entry) || typeof entry.store !== 'string') return null
+  const store = stores.find((s) => s.name.toLowerCase() === entry.store.trim().toLowerCase())
+  if (!store) return null
+  return {
+    store: store.id,
+    price: typeof entry.price === 'string' ? entry.price : null,
+    product_url: typeof entry.product_url === 'string' ? entry.product_url : '',
+  }
+}
+
 function toGroceryItemInput(item: unknown, stores: Store[]): GroceryItemInput | null {
   if (!isPlainRecord(item) || typeof item.name !== 'string' || !item.name.trim()) {
     return null
   }
-  const storeName = item.store
-  if (typeof storeName !== 'string') return null
-  const store = stores.find((s) => s.name.toLowerCase() === storeName.trim().toLowerCase())
-  if (!store) return null
+
+  const storePricesRaw = Array.isArray(item.store_prices) ? item.store_prices : []
+  const store_prices = storePricesRaw
+    .map((entry) => toStorePriceInput(entry, stores))
+    .filter((sp): sp is GroceryItemInput['store_prices'][number] => sp !== null)
+  if (store_prices.length === 0) return null
 
   const aisle =
     typeof item.aisle === 'string' && AISLE_OPTIONS.some((a) => a.value === item.aisle)
@@ -79,15 +102,13 @@ function toGroceryItemInput(item: unknown, stores: Store[]): GroceryItemInput | 
       : ''
 
   return {
-    store: store.id,
     name: item.name,
     brand: typeof item.brand === 'string' ? item.brand : '',
     aisle,
     grams: typeof item.grams === 'number' ? item.grams : null,
     pieces: typeof item.pieces === 'number' ? item.pieces : null,
     milliliters: typeof item.milliliters === 'number' ? item.milliliters : null,
-    price: typeof item.price === 'string' ? item.price : null,
-    product_url: typeof item.product_url === 'string' ? item.product_url : '',
+    store_prices,
     trolley_url: typeof item.trolley_url === 'string' ? item.trolley_url : '',
     image_url: typeof item.image_url === 'string' ? item.image_url : '',
   }
@@ -96,8 +117,8 @@ function toGroceryItemInput(item: unknown, stores: Store[]): GroceryItemInput | 
 // Reads one or more .json files, each of which may contain a single grocery
 // item object or an array of them, and flattens them into GroceryItemInputs
 // ready to POST. Files that aren't valid JSON, or that yield no entries with
-// both a name and a store matching the known list, are reported back
-// separately rather than failing the whole import.
+// both a name and at least one store price matching the known list, are
+// reported back separately rather than failing the whole import.
 export async function parseImportFiles(
   files: FileList,
   stores: Store[],

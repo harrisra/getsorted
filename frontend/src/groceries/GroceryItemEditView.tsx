@@ -29,15 +29,17 @@ export function GroceryItemEditView({
           itemId={item.id}
           submitLabel="Save"
           initialValue={{
-            store: item.store,
             name: item.name,
             brand: item.brand,
             aisle: item.aisle,
             grams: item.grams,
             pieces: item.pieces,
             milliliters: item.milliliters,
-            price: item.price,
-            product_url: item.product_url,
+            store_prices: item.store_prices.map((sp) => ({
+              store: sp.store,
+              price: sp.price,
+              product_url: sp.product_url,
+            })),
             trolley_url: item.trolley_url,
             image_url: item.image_url,
           }}

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from catalog.models import GroceryItem
+from catalog.models import GroceryItemPrice
 from .models import (
     MealPlan,
     MealSlot,
@@ -13,24 +13,30 @@ from .models import (
 )
 
 
-class GroceryItemSummarySerializer(serializers.ModelSerializer):
-    # Read-only here (nested under a RecipeIngredientStoreOption), so just
-    # the store's name rather than the FK id — GroceryItemCombobox displays
-    # /searches it as plain text.
+class GroceryItemPriceSummarySerializer(serializers.ModelSerializer):
+    # Read-only here (nested under a RecipeIngredientStoreOption/
+    # ShoppingListItem), so just the store's name rather than the FK id, and
+    # the product's own name/image rather than needing a second round trip
+    # to the catalog — GroceryItemCombobox displays/searches them as plain
+    # text.
     store = serializers.CharField(source="store.name", read_only=True)
+    name = serializers.CharField(source="grocery_item.name", read_only=True)
+    image_url = serializers.CharField(source="grocery_item.image_url", read_only=True)
 
     class Meta:
-        model = GroceryItem
+        model = GroceryItemPrice
         fields = ["id", "store", "name", "image_url", "price"]
 
 
 class RecipeIngredientStoreOptionSerializer(serializers.ModelSerializer):
-    grocery_item_detail = GroceryItemSummarySerializer(source="grocery_item", read_only=True)
+    grocery_item_price_detail = GroceryItemPriceSummarySerializer(
+        source="grocery_item_price", read_only=True
+    )
     line_cost = serializers.SerializerMethodField()
 
     class Meta:
         model = RecipeIngredientStoreOption
-        fields = ["id", "store", "grocery_item", "grocery_item_detail", "line_cost"]
+        fields = ["id", "store", "grocery_item_price", "grocery_item_price_detail", "line_cost"]
         read_only_fields = ["id", "store"]
 
     def get_line_cost(self, option):
@@ -70,7 +76,7 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
 
         store_options = attrs.get("store_options")
         if store_options:
-            store_ids = [opt["grocery_item"].store_id for opt in store_options]
+            store_ids = [opt["grocery_item_price"].store_id for opt in store_options]
             if len(store_ids) != len(set(store_ids)):
                 raise serializers.ValidationError(
                     {"store_options": "Only one grocery item match is allowed per store."}
@@ -137,12 +143,12 @@ class RecipeSerializer(RecipeImageMixin, serializers.ModelSerializer):
             ingredient = RecipeIngredient(recipe=recipe, **data)
             ingredients.append(ingredient)
             for opt in store_options_data:
-                grocery_item = opt["grocery_item"]
+                grocery_item_price = opt["grocery_item_price"]
                 options.append(
                     RecipeIngredientStoreOption(
                         recipe_ingredient=ingredient,
-                        grocery_item=grocery_item,
-                        store_id=grocery_item.store_id,
+                        grocery_item_price=grocery_item_price,
+                        store_id=grocery_item_price.store_id,
                     )
                 )
         # Ingredients first — the options' FK needs their (UUID, so already
@@ -240,7 +246,9 @@ class ShoppingListItemSerializer(serializers.ModelSerializer):
     # the response (not serialized as null) for an item added_by=None — see
     # the equivalent note on catalog.GroceryItemSerializer.created_by_email.
     added_by_email = serializers.SerializerMethodField()
-    grocery_item_detail = GroceryItemSummarySerializer(source="grocery_item", read_only=True)
+    grocery_item_price_detail = GroceryItemPriceSummarySerializer(
+        source="grocery_item_price", read_only=True
+    )
     packs_needed = serializers.SerializerMethodField()
 
     class Meta:
@@ -253,8 +261,8 @@ class ShoppingListItemSerializer(serializers.ModelSerializer):
             "grams",
             "pieces",
             "milliliters",
-            "grocery_item",
-            "grocery_item_detail",
+            "grocery_item_price",
+            "grocery_item_price_detail",
             "packs_needed",
             "is_checked",
             "added_by",

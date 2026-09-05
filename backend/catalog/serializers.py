@@ -1,12 +1,21 @@
 from rest_framework import serializers
 
-from .models import GroceryItem, Store, is_trolley_url
+from .models import GroceryItem, GroceryItemPrice, Store, is_trolley_url
 
 
 class StoreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Store
         fields = ["id", "name"]
+
+
+class GroceryItemPriceSerializer(serializers.ModelSerializer):
+    store_detail = StoreSerializer(source="store", read_only=True)
+
+    class Meta:
+        model = GroceryItemPrice
+        fields = ["id", "store", "store_detail", "price", "product_url", "updated_at"]
+        read_only_fields = ["updated_at"]
 
 
 class GroceryItemSerializer(serializers.ModelSerializer):
@@ -17,24 +26,24 @@ class GroceryItemSerializer(serializers.ModelSerializer):
     # Field.get_attribute() turns that into SkipField for a non-required
     # field. A method field sidesteps that and always returns a value.
     created_by_email = serializers.SerializerMethodField()
-    store_detail = StoreSerializer(source="store", read_only=True)
+    # Written as raw dicts by create()/update() below rather than through
+    # this nested serializer's own create/update, same pattern as
+    # mealplanner.RecipeSerializer's ingredients.
+    store_prices = GroceryItemPriceSerializer(many=True, required=False)
 
     class Meta:
         model = GroceryItem
         fields = [
             "id",
-            "store",
-            "store_detail",
             "name",
             "brand",
             "aisle",
             "grams",
             "pieces",
             "milliliters",
-            "price",
-            "product_url",
             "trolley_url",
             "image_url",
+            "store_prices",
             "created_by_email",
             "created_at",
             "updated_at",
@@ -50,12 +59,62 @@ class GroceryItemSerializer(serializers.ModelSerializer):
 
         if value("grams") is None and value("pieces") is None and value("milliliters") is None:
             raise serializers.ValidationError("Provide grams, pieces, and/or milliliters.")
+
+        store_prices = attrs.get("store_prices")
+        if store_prices:
+            store_ids = [sp["store"].id for sp in store_prices]
+            if len(store_ids) != len(set(store_ids)):
+                raise serializers.ValidationError(
+                    {"store_prices": "Only one price is allowed per store."}
+                )
         return attrs
 
     def validate_trolley_url(self, value):
         if value and not is_trolley_url(value):
             raise serializers.ValidationError("Must be a trolley.co.uk product page URL.")
         return value
+
+    def create(self, validated_data):
+        store_prices_data = validated_data.pop("store_prices", [])
+        item = super().create(validated_data)
+        self._sync_store_prices(item, store_prices_data)
+        return item
+
+    def update(self, instance, validated_data):
+        store_prices_data = validated_data.pop("store_prices", None)
+        item = super().update(instance, validated_data)
+        if store_prices_data is not None:
+            self._sync_store_prices(item, store_prices_data)
+        return item
+
+    def _sync_store_prices(self, item, store_prices_data):
+        """Update existing rows in place and add/remove as needed, rather
+        than always deleting and recreating every row on every save — other
+        rows (RecipeIngredientStoreOption, ShoppingListItem) reference a
+        GroceryItemPrice by id, so recreating them on every edit would
+        silently break every such match each time this item's form is
+        saved.
+        """
+        existing_by_store = {price.store_id: price for price in item.store_prices.all()}
+        seen_store_ids = set()
+        for data in store_prices_data:
+            store = data["store"]
+            seen_store_ids.add(store.id)
+            existing = existing_by_store.get(store.id)
+            if existing:
+                existing.price = data.get("price")
+                existing.product_url = data.get("product_url", "")
+                existing.save(update_fields=["price", "product_url", "updated_at"])
+            else:
+                GroceryItemPrice.objects.create(
+                    grocery_item=item,
+                    store=store,
+                    price=data.get("price"),
+                    product_url=data.get("product_url", ""),
+                )
+        for store_id, existing in existing_by_store.items():
+            if store_id not in seen_store_ids:
+                existing.delete()
 
 
 class RefreshPriceRequestSerializer(serializers.Serializer):
