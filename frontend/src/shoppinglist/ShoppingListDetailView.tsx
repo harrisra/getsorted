@@ -318,10 +318,11 @@ export function ShoppingListDetailView({
     }
   }
 
-  // Toggling a store off re-points (server-side) any items currently
-  // priced there to the cheapest still-selected alternative — toggling one
-  // back on doesn't undo that, it only affects future toggles. Refetches
-  // items afterward so any reassignment shows up immediately.
+  // Re-points (server-side) every priced item at the cheapest currently-
+  // selected store in either direction — excluding a store moves items
+  // away from it, re-including one can bring it back if it's cheapest
+  // again. Refetches items afterward so any reassignment shows up
+  // immediately.
   async function handleToggleStore(storeId: string) {
     const excluded = new Set(list.excluded_stores)
     if (excluded.has(storeId)) excluded.delete(storeId)

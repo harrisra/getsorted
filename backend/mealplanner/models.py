@@ -223,8 +223,8 @@ class ShoppingList(models.Model):
     # default, so every store starts "in" (the UI shows all of them
     # depressed/selected) without needing to backfill anything when a list
     # is created or a new Store is added to the catalog later. Toggling one
-    # off re-points any items currently priced at that store elsewhere —
-    # see reassign_items_away_from_stores.
+    # in either direction re-optimizes every item's store on this list —
+    # see reoptimize_item_stores.
     excluded_stores = models.ManyToManyField(
         "catalog.Store", blank=True, related_name="excluded_from_shopping_lists"
     )
@@ -239,21 +239,27 @@ class ShoppingList(models.Model):
     def __str__(self):
         return f"{self.household.name} — {self.name}"
 
-    def reassign_items_away_from_stores(self, newly_excluded_store_ids):
-        """For every item on this list currently priced at one of
-        `newly_excluded_store_ids`, re-point it at the cheapest still-
-        selected alternative — the same product at a different store, or a
+    def reoptimize_item_stores(self):
+        """Re-point every priced item on this list at the cheapest
+        currently-selected store for whatever it's matched as, recomputed
+        from scratch — used whenever which stores are excluded changes, in
+        either direction: excluding a store moves items away from it, and
+        re-including one can bring it back as the cheapest option again for
+        items that had moved off it while it was excluded.
+
+        A candidate is the same product at a different store, or a
         different product whose catalog name mentions this item's name
-        (the same candidate search the frontend's per-item store picker
-        uses) — leaving it unchanged if no alternative is available among
-        the stores still selected.
+        (the same search the frontend's per-item store picker uses).
+        Leaves an item unchanged if it's already at the cheapest available
+        store, or if no alternative is available among the stores still
+        selected.
         """
         excluded_store_ids = set(self.excluded_stores.values_list("id", flat=True))
-        affected = self.items.select_related(
+        items = self.items.select_related(
             "grocery_item_price__grocery_item", "grocery_item_price__store"
-        ).filter(grocery_item_price__store_id__in=newly_excluded_store_ids)
+        ).exclude(grocery_item_price__isnull=True)
 
-        for item in affected:
+        for item in items:
             current = item.grocery_item_price
             cheapest = (
                 GroceryItemPrice.objects.filter(
@@ -265,7 +271,7 @@ class ShoppingList(models.Model):
                 .order_by("price")
                 .first()
             )
-            if cheapest is not None:
+            if cheapest is not None and cheapest.id != current.id:
                 item.grocery_item_price = cheapest
                 item.save(update_fields=["grocery_item_price"])
 
