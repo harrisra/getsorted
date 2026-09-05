@@ -286,7 +286,6 @@ export function ShoppingListDetailView({
   const [renameError, setRenameError] = useState<string | null>(null)
   const [stores, setStores] = useState<Store[]>([])
   const [catalogSearch, setCatalogSearch] = useState('')
-  const [catalogStoreFilter, setCatalogStoreFilter] = useState('')
   const [addingCatalogItemId, setAddingCatalogItemId] = useState<string | null>(null)
   const [catalogAddError, setCatalogAddError] = useState<string | null>(null)
   const [essentials, setEssentials] = useState<Essentials[]>([])
@@ -327,14 +326,14 @@ export function ShoppingListDetailView({
     : null
 
   // Grocery catalog (item, store) prices shown in the "Add from grocery
-  // items" panel — free-text search over name/brand plus an optional store
-  // filter, same filtering shape as the main grocery items page.
+  // items" panel — free-text search over name/brand/store, same as the
+  // main grocery items page (no separate store filter dropdown there
+  // either — typing the store's name does the same job).
   const trimmedCatalogSearch = catalogSearch.trim().toLowerCase()
   const catalogResults = groceryItemOptions.filter((option) => {
-    if (catalogStoreFilter && option.store !== catalogStoreFilter) return false
     if (
       trimmedCatalogSearch &&
-      !`${option.name} ${option.brand}`.toLowerCase().includes(trimmedCatalogSearch)
+      !`${option.name} ${option.brand} ${option.storeName}`.toLowerCase().includes(trimmedCatalogSearch)
     ) {
       return false
     }
@@ -737,28 +736,12 @@ export function ShoppingListDetailView({
               aria-label="Search grocery items to add"
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
             />
-            <select
-              value={catalogStoreFilter}
-              onChange={(e) => setCatalogStoreFilter(e.target.value)}
-              aria-label="Filter grocery items by store"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-slate-500 focus:outline-none"
-            >
-              <option value="">All stores</option>
-              {stores.map((store) => (
-                <option key={store.id} value={store.id}>
-                  {store.name}
-                </option>
-              ))}
-            </select>
-
             {catalogAddError && <p className="text-sm text-red-600">{catalogAddError}</p>}
 
             <ul className="max-h-72 divide-y divide-slate-200 overflow-y-auto rounded-md border border-slate-200">
               {catalogResults.length === 0 && (
                 <li className="px-3 py-3 text-sm text-slate-400">
-                  {trimmedCatalogSearch || catalogStoreFilter
-                    ? 'No grocery items match.'
-                    : 'Search for a grocery item to add it.'}
+                  {trimmedCatalogSearch ? 'No grocery items match.' : 'Search for a grocery item to add it.'}
                 </li>
               )}
               {catalogResults.map((option) => (
