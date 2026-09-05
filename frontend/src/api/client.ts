@@ -294,6 +294,11 @@ export interface GroceryItemStorePrice {
   store: string
   store_detail: Store
   price: string | null
+  // This store's current promotional/loyalty-card price (e.g. Tesco
+  // Clubcard, Sainsbury's Nectar), if it has one right now — separate from
+  // `price` (the regular shelf price) since it's often conditional rather
+  // than what everyone pays. null if there's no current offer.
+  promo_price: string | null
   product_url: string
   updated_at: string
 }
@@ -345,6 +350,7 @@ export interface GroceryItemStorePriceOption {
   pieces: number | null
   milliliters: number | null
   price: string | null
+  promo_price: string | null
   product_url: string
   image_url: string
 }
@@ -363,6 +369,7 @@ export function flattenGroceryItemPrices(items: GroceryItem[]): GroceryItemStore
       pieces: item.pieces,
       milliliters: item.milliliters,
       price: sp.price,
+      promo_price: sp.promo_price,
       product_url: sp.product_url,
       image_url: item.image_url,
     })),
@@ -453,6 +460,7 @@ export interface GroceryItemRef {
   name: string
   image_url: string
   price: string | null
+  promo_price: string | null
 }
 
 // The matched product itself, just enough to display/search it — each

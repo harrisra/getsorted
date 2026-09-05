@@ -647,7 +647,14 @@ export function ShoppingListDetailView({
                     )}
                     <div className="min-w-0">
                       <p className="truncate text-sm text-slate-800">{option.name}</p>
-                      {option.price && <p className="text-xs text-slate-500">£{option.price}</p>}
+                      {option.price && (
+                        <p className="text-xs text-slate-500">
+                          £{option.price}
+                          {option.promo_price && (
+                            <span className="font-medium text-amber-600"> (promo £{option.promo_price})</span>
+                          )}
+                        </p>
+                      )}
                     </div>
                   </div>
                   {/* Store column, between the item name and the Add button. */}
@@ -852,6 +859,7 @@ export function ShoppingListDetailView({
                             <option key={option.id} value={option.id}>
                               {option.storeName} — {option.name}
                               {option.price ? ` — £${option.price}` : ''}
+                              {option.promo_price ? ` (promo £${option.promo_price})` : ''}
                             </option>
                           ))}
                         </select>

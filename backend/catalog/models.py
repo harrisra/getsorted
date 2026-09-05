@@ -114,6 +114,15 @@ class GroceryItemPrice(models.Model):
     )
     store = models.ForeignKey(Store, on_delete=models.PROTECT, related_name="grocery_item_prices")
     price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    # This store's current promotional/loyalty-card price, if it has one
+    # right now (e.g. a Tesco Clubcard or Sainsbury's Nectar price) — kept
+    # separate from `price` (the regular shelf price) since the promo is
+    # often conditional rather than what everyone pays, and is scraped from
+    # trolley.co.uk's own per-store offer badge (see
+    # catalog.views._extract_store_rows). Cleared on refresh if the store's
+    # row no longer shows an offer, same as `price` is always overwritten —
+    # a promotion ending isn't evidence the old promo_price is still valid.
+    promo_price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     # This store's own product page for the item — moved here from
     # GroceryItem since it's store-specific (unlike trolley_url above, which
     # compares across stores and so stays on GroceryItem itself).

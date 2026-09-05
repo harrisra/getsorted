@@ -27,14 +27,28 @@ SCRAPE_USER_AGENT = (
 # matters).
 COMPARISON_TABLE_RE = re.compile(r'class="comparison-table".*?</section>', re.DOTALL)
 
-# One row of that table: a store's logo/title, then that store's price for
-# this product. Prices are seen written both as a plain "£" character and
-# as the "&pound;" HTML entity (observed to differ between pages), so both
-# are matched; the price may or may not be wrapped in <b>.
+# One row of that table: a store's logo/title, that store's regular price,
+# and — if trolley.co.uk shows one — a promotional/loyalty-card offer badge
+# right after it, e.g. "95P CLUBCARD" or "£4 NECTAR" (see _parse_offer_price).
+# Prices are seen written both as a plain "£" character and as the
+# "&pound;" HTML entity (observed to differ between pages), so both are
+# matched; the price may or may not be wrapped in <b>. The `.*?</div></div>`
+# after the price is the closing of its per-100g-price sub-div and the price
+# div itself — reaching exactly there (not further) before optionally
+# checking for an offer badge is what keeps this from accidentally picking
+# up a later row's offer when this row has none.
 STORE_ROW_RE = re.compile(
-    r'<svg title="([^"]+)" class="store-logo[^"]*">.*?class="_price">\s*(?:<b>)?(?:&pound;|£)\s*([\d,]+\.\d{2})',
+    r'<svg title="([^"]+)" class="store-logo[^"]*">.*?'
+    r'class="_price">\s*(?:<b>)?(?:&pound;|£)\s*([\d,]+\.\d{2}).*?</div></div>'
+    r'(?:<div class="_product-offer">([^<]*)</div>)?',
     re.DOTALL,
 )
+
+# A price inside a store's offer badge text, e.g. "95P CLUBCARD" (pence, no
+# decimal) or "£4 NECTAR"/"£1.50 NECTAR PRICE" (pounds). Some offer badges
+# have no extractable price at all (e.g. "20% OFF", "BUY ONE GET ONE FREE")
+# — see _parse_offer_price.
+OFFER_PRICE_RE = re.compile(r"(?:&pound;|£)\s*(\d+(?:\.\d{2})?)|(\d+)p\b", re.IGNORECASE)
 
 # trolley.co.uk's own schema.org Product block, e.g.
 # {"@type": "Product", "name": "Cathedral City Extra Mature Cheddar Cheese
@@ -53,6 +67,21 @@ NAME_SIZE_RE = re.compile(r"^(.*?)\s*\(([^()]+)\)\s*$")
 SIZE_RE = re.compile(
     r"(\d+(?:\.\d+)?)\s*(kg|g|litres?|l|ml)\b|(\d+)\s*(?:x|pack|pieces?|pcs?)\b", re.IGNORECASE
 )
+
+
+def _parse_offer_price(text):
+    """Best-effort price from a store's promotional-offer badge text, e.g.
+    "95P CLUBCARD" -> "0.95", "£4 NECTAR" -> "4.00". None if the text
+    doesn't contain a recognizable price (e.g. "20% OFF")."""
+    if not text:
+        return None
+    match = OFFER_PRICE_RE.search(text)
+    if not match:
+        return None
+    pounds, pence = match.group(1), match.group(2)
+    if pounds is not None:
+        return f"{float(pounds):.2f}"
+    return f"{int(pence) / 100:.2f}"
 
 
 def _normalize_store_name(name):
@@ -100,11 +129,14 @@ def _extract_store_rows(html):
     on that same page (£3.00).
 
     So instead this walks the page's own per-store comparison table (each
-    row: a store logo/title plus that store's price) and returns every row
-    found there, for the caller to match against the app's own Store list.
+    row: a store logo/title, that store's price, and an optional
+    promotional-offer badge) and returns every row found there, for the
+    caller to match against the app's own Store list.
 
     Returns (rows, error): exactly one is None. `rows` is a list of
-    (store_name, price) tuples, price as a decimal string e.g. "0.85".
+    (store_name, price, promo_price) tuples — price a decimal string e.g.
+    "0.85", promo_price the same or None if this store has no current offer
+    (or the offer badge had no extractable price, e.g. "20% OFF").
     """
     # Scoped to just the comparison table, not the whole page — trolley.co.uk
     # also has "alternative products" widgets elsewhere on the page using the
@@ -118,8 +150,8 @@ def _extract_store_rows(html):
         )
 
     rows = [
-        (row_store, price.replace(",", ""))
-        for row_store, price in STORE_ROW_RE.findall(table_match.group(0))
+        (row_store, price.replace(",", ""), _parse_offer_price(offer_text))
+        for row_store, price, offer_text in STORE_ROW_RE.findall(table_match.group(0))
     ]
     return rows, None
 
@@ -185,10 +217,10 @@ def _scrape_trolley_product(trolley_url):
 
     Returns (data, error): exactly one is None. `data` is
     {"name", "grams", "pieces", "milliliters", "image_url", "store_prices"}
-    — store_prices is the same (store_name, price) list _scrape_trolley_prices
-    returns; empty (not an error) if the page's comparison table couldn't be
-    found, since the product details alone are still worth creating an item
-    from.
+    — store_prices is the same (store_name, price, promo_price) list
+    _scrape_trolley_prices returns; empty (not an error) if the page's
+    comparison table couldn't be found, since the product details alone are
+    still worth creating an item from.
     """
     html, error = _fetch_trolley_page(trolley_url)
     if error:
@@ -289,12 +321,14 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
         stores_by_normalized_name = {_normalize_store_name(s.name): s for s in Store.objects.all()}
         store_prices_data = []
         unmatched_stores = []
-        for row_store, price in product["store_prices"]:
+        for row_store, price, promo_price in product["store_prices"]:
             store = stores_by_normalized_name.get(_normalize_store_name(row_store))
             if store is None:
                 unmatched_stores.append(row_store)
                 continue
-            store_prices_data.append({"store": str(store.id), "price": price, "product_url": ""})
+            store_prices_data.append(
+                {"store": str(store.id), "price": price, "promo_price": promo_price, "product_url": ""}
+            )
 
         serializer = GroceryItemSerializer(
             data={
@@ -336,6 +370,12 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
         wrong. Rows that don't match any known Store are reported back but
         otherwise ignored.
 
+        A store's promotional/loyalty-card price (e.g. Tesco Clubcard,
+        Sainsbury's Nectar) is refreshed alongside its regular price — and,
+        unlike the regular price, cleared to None if the store's row no
+        longer shows one, since a promotion ending isn't evidence the old
+        value is still valid.
+
         Open to any signed-in user — it's a plain GET of a URL, same as
         editing the item by hand.
         """
@@ -353,13 +393,13 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
 
         stores_by_normalized_name = {_normalize_store_name(s.name): s for s in Store.objects.all()}
         unmatched_stores = []
-        for row_store, price in rows:
+        for row_store, price, promo_price in rows:
             store = stores_by_normalized_name.get(_normalize_store_name(row_store))
             if store is None:
                 unmatched_stores.append(row_store)
                 continue
             GroceryItemPrice.objects.update_or_create(
-                grocery_item=item, store=store, defaults={"price": price}
+                grocery_item=item, store=store, defaults={"price": price, "promo_price": promo_price}
             )
 
         item.trolley_url = trolley_url

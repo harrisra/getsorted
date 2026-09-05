@@ -26,7 +26,7 @@ class GroceryItemPriceSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = GroceryItemPrice
-        fields = ["id", "store", "name", "image_url", "price"]
+        fields = ["id", "store", "name", "image_url", "price", "promo_price"]
 
 
 class GroceryItemSummarySerializer(serializers.ModelSerializer):

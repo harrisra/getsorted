@@ -14,7 +14,7 @@ class GroceryItemPriceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = GroceryItemPrice
-        fields = ["id", "store", "store_detail", "price", "product_url", "updated_at"]
+        fields = ["id", "store", "store_detail", "price", "promo_price", "product_url", "updated_at"]
         read_only_fields = ["updated_at"]
 
 
@@ -102,13 +102,15 @@ class GroceryItemSerializer(serializers.ModelSerializer):
             existing = existing_by_store.get(store.id)
             if existing:
                 existing.price = data.get("price")
+                existing.promo_price = data.get("promo_price")
                 existing.product_url = data.get("product_url", "")
-                existing.save(update_fields=["price", "product_url", "updated_at"])
+                existing.save(update_fields=["price", "promo_price", "product_url", "updated_at"])
             else:
                 GroceryItemPrice.objects.create(
                     grocery_item=item,
                     store=store,
                     price=data.get("price"),
+                    promo_price=data.get("promo_price"),
                     product_url=data.get("product_url", ""),
                 )
         for store_id, existing in existing_by_store.items():

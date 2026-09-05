@@ -38,6 +38,7 @@ export function GroceryItemEditView({
             store_prices: item.store_prices.map((sp) => ({
               store: sp.store,
               price: sp.price,
+              promo_price: sp.promo_price,
               product_url: sp.product_url,
             })),
             trolley_url: item.trolley_url,

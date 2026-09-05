@@ -449,6 +449,9 @@ export function GroceryItemsPage() {
                       <li key={sp.id} className="truncate">
                         <span className="font-medium text-slate-600">{sp.store_detail.name}</span>
                         {sp.price && ` £${sp.price}`}
+                        {sp.promo_price && (
+                          <span className="font-medium text-amber-600"> (promo £{sp.promo_price})</span>
+                        )}
                         {sp.product_url && (
                           <>
                             {' · '}

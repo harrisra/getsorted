@@ -57,7 +57,10 @@ export function GroceryItemForm({
   }
 
   function addStorePrice(storeId: string) {
-    set('store_prices', [...values.store_prices, { store: storeId, price: null, product_url: '' }])
+    set('store_prices', [
+      ...values.store_prices,
+      { store: storeId, price: null, promo_price: null, product_url: '' },
+    ])
   }
 
   function updateStorePrice(storeId: string, patch: Partial<GroceryItemStorePriceInput>) {
@@ -95,6 +98,7 @@ export function GroceryItemForm({
         updated.store_prices.map((sp) => ({
           store: sp.store,
           price: sp.price,
+          promo_price: sp.promo_price,
           product_url: sp.product_url,
         })),
       )
@@ -126,6 +130,7 @@ export function GroceryItemForm({
         store_prices: values.store_prices.map((sp) => ({
           ...sp,
           price: sp.price?.toString().trim() || null,
+          promo_price: sp.promo_price?.toString().trim() || null,
         })),
       })
     } catch (err) {
@@ -277,7 +282,15 @@ export function GroceryItemForm({
                   placeholder="Price, e.g. 2.20"
                   value={sp.price ?? ''}
                   onChange={(e) => updateStorePrice(sp.store, { price: e.target.value })}
-                  className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                  className="w-24 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <input
+                  type="text"
+                  title="Promo/loyalty-card price, if there's one on right now"
+                  placeholder="Promo price"
+                  value={sp.promo_price ?? ''}
+                  onChange={(e) => updateStorePrice(sp.store, { promo_price: e.target.value })}
+                  className="w-24 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-sm focus:border-amber-400 focus:outline-none"
                 />
                 <input
                   type="url"

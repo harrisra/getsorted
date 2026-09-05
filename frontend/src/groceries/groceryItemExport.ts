@@ -8,6 +8,7 @@ import { AISLE_OPTIONS, type Aisle, type GroceryItem, type GroceryItemInput, typ
 export interface ExportedGroceryItemPrice {
   store: string
   price: string | null
+  promo_price: string | null
   product_url: string
 }
 
@@ -34,6 +35,7 @@ function toExportedGroceryItem(item: GroceryItem): ExportedGroceryItem {
     store_prices: item.store_prices.map((sp) => ({
       store: sp.store_detail.name,
       price: sp.price,
+      promo_price: sp.promo_price,
       product_url: sp.product_url,
     })),
     trolley_url: item.trolley_url,
@@ -85,6 +87,7 @@ function toStorePriceInput(
   return {
     store: store.id,
     price: typeof entry.price === 'string' ? entry.price : null,
+    promo_price: typeof entry.promo_price === 'string' ? entry.promo_price : null,
     product_url: typeof entry.product_url === 'string' ? entry.product_url : '',
   }
 }
