@@ -243,7 +243,11 @@ export function GroceryItemForm({
             }
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
           />
-          <p className="text-[11px] text-slate-400">Provide grams, pieces, and/or milliliters</p>
+          <p className="text-[11px] text-slate-400">
+            {itemId
+              ? 'Provide grams, pieces, and/or milliliters'
+              : 'Provide grams, pieces, and/or milliliters — defaults to 1 piece if left blank'}
+          </p>
         </div>
         <div className="col-span-2 flex items-end gap-3">
           <div className="flex-1">

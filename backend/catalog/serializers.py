@@ -58,7 +58,17 @@ class GroceryItemSerializer(serializers.ModelSerializer):
             return attrs.get(field, getattr(self.instance, field, None) if self.instance else None)
 
         if value("grams") is None and value("pieces") is None and value("milliliters") is None:
-            raise serializers.ValidationError("Provide grams, pieces, and/or milliliters.")
+            if self.instance is None:
+                # A brand-new item with no size specified at all — default
+                # to a single whole item/pack rather than forcing every add
+                # to specify one (many products, e.g. a jar or a tin, are
+                # naturally "1 of something" rather than a weight/volume).
+                # Editing an existing item still requires clearing down to
+                # at least one explicitly — this default is only for new
+                # items where nothing was given to begin with.
+                attrs["pieces"] = 1
+            else:
+                raise serializers.ValidationError("Provide grams, pieces, and/or milliliters.")
 
         store_prices = attrs.get("store_prices")
         if store_prices:
