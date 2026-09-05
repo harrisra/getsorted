@@ -233,12 +233,12 @@ export function ItemGroceryMatchesEditor<T extends QuantifiedItem>({
                 product name) grows that row's track past an even 50/50
                 split, landing the details/matches boundary at a different
                 width on every row instead of lined up down the page. */}
-            <div className="flex items-center justify-center lg:justify-start">
+            <div className="flex items-start justify-center">
               {cheapestImage && (
                 <img
                   src={cheapestImage}
                   alt=""
-                  className="h-16 w-16 shrink-0 rounded border border-slate-200 object-cover"
+                  className="h-16 w-16 shrink-0 rounded object-cover"
                 />
               )}
             </div>
