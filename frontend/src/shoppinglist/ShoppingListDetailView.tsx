@@ -221,19 +221,23 @@ function AccordionSection({
   children: ReactNode
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white">
+    <div>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
-        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className={`flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium transition ${
+          isOpen ? 'bg-slate-800 text-white' : 'text-slate-700 hover:bg-slate-50'
+        }`}
       >
         <span>{title}</span>
         <ChevronDownIcon
-          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 shrink-0 transition-transform ${
+            isOpen ? 'rotate-180 text-white' : 'text-slate-400'
+          }`}
         />
       </button>
-      {isOpen && <div className="space-y-3 border-t border-slate-100 p-4">{children}</div>}
+      {isOpen && <div className="space-y-3 bg-white p-4">{children}</div>}
     </div>
   )
 }
@@ -616,7 +620,7 @@ export function ShoppingListDetailView({
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[30rem_1fr] lg:items-start">
         {/* Left panel: building the list, rather than looking at it. */}
-        <div className="space-y-3">
+        <div className="divide-y divide-slate-200 border border-slate-200">
           <AccordionSection
             title="Generate from planned meals"
             isOpen={openSection === 'generate'}
