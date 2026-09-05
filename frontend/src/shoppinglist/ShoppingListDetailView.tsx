@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import {
   AISLE_OPTIONS,
   ApiError,
@@ -22,7 +22,7 @@ import {
   updateShoppingListItem,
 } from '../api/client'
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
-import { PencilIcon } from '../icons'
+import { ChevronDownIcon, PencilIcon } from '../icons'
 import { addDays, formatDateISO, formatDayHeading } from '../mealplanner/dates'
 import { StoreLogo, hasStoreLogo } from '../StoreLogo'
 import { GroceryMatchSelect } from './GroceryMatchSelect'
@@ -206,6 +206,42 @@ function sortEnriched(enriched: EnrichedItem[], mode: SortMode): EnrichedItem[] 
   return sorted
 }
 
+// One collapsible section of the left panel — only one open at a time (see
+// openSection in ShoppingListDetailView), so the four ways of adding to the
+// list don't all compete for space at once.
+function AccordionSection({
+  title,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string
+  isOpen: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+      >
+        <span>{title}</span>
+        <ChevronDownIcon
+          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {isOpen && <div className="space-y-3 border-t border-slate-100 p-4">{children}</div>}
+    </div>
+  )
+}
+
+// The left panel's four "add to the list" sections — which one's currently
+// expanded (or none).
+type LeftPanelSection = 'generate' | 'essentials' | 'add-item' | 'catalog'
+
 // A dedicated screen for one shopping list — its "generate from planned
 // meals" controls and its items — rather than a single page trying to
 // juggle every list a household has going at once.
@@ -247,6 +283,13 @@ export function ShoppingListDetailView({
   const [selectedEssentialsIds, setSelectedEssentialsIds] = useState<Set<string>>(new Set())
   const [addingEssentials, setAddingEssentials] = useState(false)
   const [addEssentialsMessage, setAddEssentialsMessage] = useState<string | null>(null)
+  // Which of the four left-panel sections is expanded — "generate" (the
+  // most commonly used) by default, only one at a time.
+  const [openSection, setOpenSection] = useState<LeftPanelSection | null>('generate')
+
+  function toggleSection(section: LeftPanelSection) {
+    setOpenSection((prev) => (prev === section ? null : section))
+  }
 
   async function refresh() {
     setItems(await fetchShoppingListItems())
@@ -573,9 +616,12 @@ export function ShoppingListDetailView({
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[30rem_1fr] lg:items-start">
         {/* Left panel: building the list, rather than looking at it. */}
-        <div className="space-y-6">
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-            <span className="text-sm font-medium text-slate-700">Generate from planned meals</span>
+        <div className="space-y-3">
+          <AccordionSection
+            title="Generate from planned meals"
+            isOpen={openSection === 'generate'}
+            onToggle={() => toggleSection('generate')}
+          >
             <div className="flex flex-wrap gap-2">
               {next7Days.map((day) => (
                 <label
@@ -605,14 +651,17 @@ export function ShoppingListDetailView({
               {generating ? 'Generating…' : `Generate shopping list (${selectedDates.size})`}
             </button>
             {generateMessage && <p className="text-sm text-slate-600">{generateMessage}</p>}
-          </div>
+          </AccordionSection>
 
           {/* The household's recurring, non-meal groupings (see
               mealplanner.Essentials) — added on demand rather than for
               specific planned days, since there's nothing to schedule. */}
           {essentials.filter((e) => e.household === list.household).length > 0 && (
-            <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-              <span className="text-sm font-medium text-slate-700">Add essentials</span>
+            <AccordionSection
+              title="Add essentials"
+              isOpen={openSection === 'essentials'}
+              onToggle={() => toggleSection('essentials')}
+            >
               <div className="flex flex-wrap gap-2">
                 {essentials
                   .filter((e) => e.household === list.household)
@@ -648,11 +697,14 @@ export function ShoppingListDetailView({
               {addEssentialsMessage && (
                 <p className="text-sm text-slate-600">{addEssentialsMessage}</p>
               )}
-            </div>
+            </AccordionSection>
           )}
 
-          <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
-            <span className="text-sm font-medium text-slate-700">Add an item</span>
+          <AccordionSection
+            title="Add an item"
+            isOpen={openSection === 'add-item'}
+            onToggle={() => toggleSection('add-item')}
+          >
             <form onSubmit={handleAddItem} className="space-y-2">
               <input
                 type="text"
@@ -696,10 +748,13 @@ export function ShoppingListDetailView({
               </button>
             </form>
             {addError && <p className="text-sm text-red-600">{addError}</p>}
-          </div>
+          </AccordionSection>
 
-          <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
-            <span className="text-sm font-medium text-slate-700">Add from grocery items</span>
+          <AccordionSection
+            title="Add from grocery items"
+            isOpen={openSection === 'catalog'}
+            onToggle={() => toggleSection('catalog')}
+          >
             <input
               type="search"
               placeholder="Search grocery items…"
@@ -779,7 +834,7 @@ export function ShoppingListDetailView({
                 </li>
               ))}
             </ul>
-          </div>
+          </AccordionSection>
         </div>
 
         {/* Right panel: the list itself, filling whatever width is left

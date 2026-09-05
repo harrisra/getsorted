@@ -114,6 +114,14 @@ export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function ChevronDownIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <polyline points="6 9 12 15 18 9" />
+    </Icon>
+  )
+}
+
 export function LogoutIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
