@@ -606,6 +606,11 @@ export interface ShoppingList {
   household: string
   name: string
   item_count: number
+  // Stores this list's household isn't planning to visit — empty by
+  // default (every store shown "depressed"/selected). Toggling one on
+  // re-points any items currently priced there to the cheapest still-
+  // selected alternative, computed server-side.
+  excluded_stores: string[]
   created_by: string | null
   created_by_email: string | null
   created_at: string
@@ -637,6 +642,21 @@ export async function renameShoppingList(id: string, name: string): Promise<Shop
 
 export async function deleteShoppingList(id: string): Promise<void> {
   await apiFetch(`/api/mealplanner/shopping-lists/${id}/`, { method: 'DELETE' })
+}
+
+// Toggling a store out of this list re-points any items currently priced
+// there to the cheapest still-selected alternative (see the backend's
+// ShoppingList.reassign_items_away_from_stores) — toggling one back in
+// doesn't undo that; it only takes effect going forward.
+export async function updateShoppingListExcludedStores(
+  id: string,
+  excludedStores: string[],
+): Promise<ShoppingList> {
+  const response = await apiFetch(`/api/mealplanner/shopping-lists/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ excluded_stores: excludedStores }),
+  })
+  return response.json()
 }
 
 // Builds items on this list from the recipes planned across the given

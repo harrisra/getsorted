@@ -272,11 +272,36 @@ class ShoppingListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ShoppingList
-        fields = ["id", "household", "name", "item_count", "created_by", "created_by_email", "created_at"]
+        fields = [
+            "id",
+            "household",
+            "name",
+            "item_count",
+            "excluded_stores",
+            "created_by",
+            "created_by_email",
+            "created_at",
+        ]
         read_only_fields = ["created_by", "created_at"]
 
     def get_created_by_email(self, obj):
         return obj.created_by.email if obj.created_by else None
+
+    def update(self, instance, validated_data):
+        # Whichever stores are newly excluded by this save (not ones that
+        # were already excluded) get their currently-assigned items moved
+        # elsewhere — see ShoppingList.reassign_items_away_from_stores.
+        excluded_stores = validated_data.get("excluded_stores")
+        newly_excluded_ids = set()
+        if excluded_stores is not None:
+            previously_excluded_ids = set(instance.excluded_stores.values_list("id", flat=True))
+            newly_excluded_ids = {store.id for store in excluded_stores} - previously_excluded_ids
+
+        shopping_list = super().update(instance, validated_data)
+
+        if newly_excluded_ids:
+            shopping_list.reassign_items_away_from_stores(newly_excluded_ids)
+        return shopping_list
 
 
 class ShoppingListItemSerializer(serializers.ModelSerializer):

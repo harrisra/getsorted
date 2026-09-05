@@ -46,7 +46,7 @@ export function ShoppingListsPage() {
         <ShoppingListDetailView
           list={selectedList}
           onBack={() => setSelectedListId(null)}
-          onRenamed={(updated) =>
+          onUpdated={(updated) =>
             setLists((prev) => prev?.map((l) => (l.id === updated.id ? updated : l)) ?? prev)
           }
         />

@@ -15,6 +15,7 @@ import {
   flattenGroceryItemPrices,
   generateShoppingList,
   renameShoppingList,
+  updateShoppingListExcludedStores,
   updateShoppingListItem,
 } from '../api/client'
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
@@ -209,15 +210,15 @@ function sortEnriched(enriched: EnrichedItem[], mode: SortMode): EnrichedItem[] 
 export function ShoppingListDetailView({
   list,
   onBack,
-  onRenamed,
+  onUpdated,
 }: {
   list: ShoppingList
   onBack: () => void
-  // Called with the updated list after a successful rename, so the parent
-  // (which owns the list of ShoppingLists) can keep its copy — and so the
-  // browse page's row — in sync too, rather than this view's header being
-  // the only place that knows about the new name.
-  onRenamed: (list: ShoppingList) => void
+  // Called with the updated list after a successful rename or store-toggle,
+  // so the parent (which owns the list of ShoppingLists) can keep its copy
+  // — and so the browse page's row — in sync too, rather than this view's
+  // header being the only place that knows about the change.
+  onUpdated: (list: ShoppingList) => void
 }) {
   const [items, setItems] = useState<ShoppingListItem[] | null>(null)
   const [groceryItemOptions, setGroceryItemOptions] = useState<GroceryItemStorePriceOption[]>([])
@@ -304,7 +305,7 @@ export function ShoppingListDetailView({
     setRenaming(true)
     try {
       const updated = await renameShoppingList(list.id, name)
-      onRenamed(updated)
+      onUpdated(updated)
       setEditingName(false)
     } catch (err) {
       setRenameError(
@@ -315,6 +316,19 @@ export function ShoppingListDetailView({
     } finally {
       setRenaming(false)
     }
+  }
+
+  // Toggling a store off re-points (server-side) any items currently
+  // priced there to the cheapest still-selected alternative — toggling one
+  // back on doesn't undo that, it only affects future toggles. Refetches
+  // items afterward so any reassignment shows up immediately.
+  async function handleToggleStore(storeId: string) {
+    const excluded = new Set(list.excluded_stores)
+    if (excluded.has(storeId)) excluded.delete(storeId)
+    else excluded.add(storeId)
+    const updated = await updateShoppingListExcludedStores(list.id, Array.from(excluded))
+    onUpdated(updated)
+    await refresh()
   }
 
   async function handleGenerate() {
@@ -721,6 +735,35 @@ export function ShoppingListDetailView({
           {visibleItems === null && <p className="text-sm text-slate-400">Loading…</p>}
           {visibleItems !== null && visibleItems.length === 0 && (
             <p className="text-sm text-slate-500">Nothing on this list yet.</p>
+          )}
+
+          {visibleItems !== null && visibleItems.length > 0 && stores.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-slate-700">Visiting:</span>
+              {stores.map((store) => {
+                const visiting = !list.excluded_stores.includes(store.id)
+                return (
+                  <button
+                    key={store.id}
+                    type="button"
+                    onClick={() => handleToggleStore(store.id)}
+                    aria-pressed={visiting}
+                    title={
+                      visiting
+                        ? `Not going to ${store.name}? Click to move its items elsewhere.`
+                        : `Visit ${store.name} after all.`
+                    }
+                    className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
+                      visiting
+                        ? 'border-slate-800 bg-slate-800 text-white'
+                        : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {store.name}
+                  </button>
+                )
+              })}
+            </div>
           )}
 
           {visibleItems !== null && visibleItems.length > 0 && (

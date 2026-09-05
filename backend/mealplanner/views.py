@@ -216,7 +216,7 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
     """A household can have several shopping lists going at once (e.g.
     "This week", "Costco run")."""
 
-    queryset = ShoppingList.objects.all()
+    queryset = ShoppingList.objects.prefetch_related("excluded_stores")
     serializer_class = ShoppingListSerializer
 
     def perform_create(self, serializer):

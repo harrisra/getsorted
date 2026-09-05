@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from accounts.models import Household
+from catalog.models import GroceryItemPrice
 
 
 class MealType(models.TextChoices):
@@ -218,6 +219,15 @@ class ShoppingList(models.Model):
         Household, on_delete=models.CASCADE, related_name="shopping_lists"
     )
     name = models.CharField(max_length=255)
+    # Stores the household isn't planning to visit for this list — empty by
+    # default, so every store starts "in" (the UI shows all of them
+    # depressed/selected) without needing to backfill anything when a list
+    # is created or a new Store is added to the catalog later. Toggling one
+    # off re-points any items currently priced at that store elsewhere —
+    # see reassign_items_away_from_stores.
+    excluded_stores = models.ManyToManyField(
+        "catalog.Store", blank=True, related_name="excluded_from_shopping_lists"
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
     )
@@ -228,6 +238,36 @@ class ShoppingList(models.Model):
 
     def __str__(self):
         return f"{self.household.name} — {self.name}"
+
+    def reassign_items_away_from_stores(self, newly_excluded_store_ids):
+        """For every item on this list currently priced at one of
+        `newly_excluded_store_ids`, re-point it at the cheapest still-
+        selected alternative — the same product at a different store, or a
+        different product whose catalog name mentions this item's name
+        (the same candidate search the frontend's per-item store picker
+        uses) — leaving it unchanged if no alternative is available among
+        the stores still selected.
+        """
+        excluded_store_ids = set(self.excluded_stores.values_list("id", flat=True))
+        affected = self.items.select_related(
+            "grocery_item_price__grocery_item", "grocery_item_price__store"
+        ).filter(grocery_item_price__store_id__in=newly_excluded_store_ids)
+
+        for item in affected:
+            current = item.grocery_item_price
+            cheapest = (
+                GroceryItemPrice.objects.filter(
+                    models.Q(grocery_item__name__icontains=item.name)
+                    | models.Q(grocery_item_id=current.grocery_item_id)
+                )
+                .exclude(store_id__in=excluded_store_ids)
+                .exclude(price__isnull=True)
+                .order_by("price")
+                .first()
+            )
+            if cheapest is not None:
+                item.grocery_item_price = cheapest
+                item.save(update_fields=["grocery_item_price"])
 
 
 class ShoppingListItem(models.Model):
