@@ -16,7 +16,6 @@ import {
 } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
-import { PencilIcon } from '../icons'
 import { StoreLogo, hasStoreLogo } from '../StoreLogo'
 import { GroceryItemEditView } from './GroceryItemEditView'
 import { GroceryItemForm } from './GroceryItemForm'
@@ -470,13 +469,16 @@ export function GroceryItemsPage() {
         {filteredItems?.map((item) => (
           <li
             key={item.id}
-            className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+            onClick={() => setEditingId(item.id)}
+            title="Click to edit"
+            className="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
           >
             <div className="flex min-w-0 items-center gap-3">
               <input
                 type="checkbox"
                 checked={selectedIds.has(item.id)}
                 onChange={() => toggleSelected(item.id)}
+                onClick={(e) => e.stopPropagation()}
                 aria-label={`Select ${item.name}`}
                 className="h-4 w-4 shrink-0 rounded border-slate-300"
               />
@@ -498,6 +500,7 @@ export function GroceryItemsPage() {
                         href={item.trolley_url}
                         target="_blank"
                         rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="text-blue-600 hover:underline"
                       >
                         Trolley
@@ -527,6 +530,7 @@ export function GroceryItemsPage() {
                               href={sp.product_url}
                               target="_blank"
                               rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
                               className="text-blue-600 hover:underline"
                             >
                               Product page
@@ -539,22 +543,18 @@ export function GroceryItemsPage() {
                 )}
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-3">
+            {/* stopPropagation here — none of this should also open the
+                edit view the row's own click already opens. */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex shrink-0 items-center gap-3"
+            >
               <span
                 className="max-w-[10rem] truncate text-xs text-slate-400"
                 title={item.created_by_email ?? undefined}
               >
                 {item.created_by_email ?? 'Unknown'}
               </span>
-              <button
-                type="button"
-                onClick={() => setEditingId(item.id)}
-                title="Edit"
-                aria-label="Edit"
-                className="text-slate-500 hover:text-slate-900"
-              >
-                <PencilIcon className="h-4 w-4" />
-              </button>
               {(item.created_by_email == null || item.created_by_email === user?.email) && (
                 <ConfirmDeleteButton
                   label="Remove grocery item"
