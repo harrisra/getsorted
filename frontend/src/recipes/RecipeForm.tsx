@@ -159,6 +159,34 @@ export function RecipeForm({
     return groceryItems.filter((item) => !matchedIds.has(item.id))
   }
 
+  // For every named ingredient, adds a match for each grocery item whose
+  // name contains the ingredient's name (case-insensitive) — e.g. an
+  // ingredient named "Mature Cheddar" picks up "Cathedral City Extra Mature
+  // Cheddar Cheese 550 g". A simple substring test rather than anything
+  // fancier, same spirit as the exact-match rule used for export/import.
+  // Only adds matches, never removes any already made by hand.
+  function autoMatchIngredientsByName() {
+    set(
+      'ingredients',
+      values.ingredients.map((ingredient) => {
+        const needle = ingredient.name.trim().toLowerCase()
+        if (!needle) return ingredient
+        const matchedIds = new Set(ingredient.grocery_matches.map((match) => match.grocery_item))
+        const found = groceryItems.filter(
+          (item) => !matchedIds.has(item.id) && item.name.toLowerCase().includes(needle),
+        )
+        if (found.length === 0) return ingredient
+        return {
+          ...ingredient,
+          grocery_matches: [
+            ...ingredient.grocery_matches,
+            ...found.map((item) => ({ grocery_item: item.id })),
+          ],
+        }
+      }),
+    )
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setErrors([])
@@ -330,7 +358,17 @@ export function RecipeForm({
       </div>
 
       <div className="space-y-2">
-        <span className="text-sm font-medium text-slate-700">Ingredients</span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-slate-700">Ingredients</span>
+          <button
+            type="button"
+            onClick={autoMatchIngredientsByName}
+            title="Add a grocery match for every product whose name contains an ingredient's name"
+            className="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+          >
+            Auto-match grocery items
+          </button>
+        </div>
         <div className="space-y-2">
           {values.ingredients.map((ingredient, index) => (
             <div
