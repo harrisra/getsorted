@@ -642,7 +642,7 @@ export function ShoppingListDetailView({
             outer box, so no overflow-y-auto here. */}
         <div className="flex flex-col divide-y divide-slate-200 border border-slate-200 lg:h-full lg:w-[30rem] lg:shrink-0">
           <AccordionSection
-            title="Generate from planned meals"
+            title="Planned Meals"
             isOpen={openSection === 'generate'}
             onToggle={() => toggleSection('generate')}
           >
@@ -682,7 +682,7 @@ export function ShoppingListDetailView({
               specific planned days, since there's nothing to schedule. */}
           {essentials.filter((e) => e.household === list.household).length > 0 && (
             <AccordionSection
-              title="Add essentials"
+              title="Essentials"
               isOpen={openSection === 'essentials'}
               onToggle={() => toggleSection('essentials')}
             >
@@ -725,7 +725,7 @@ export function ShoppingListDetailView({
           )}
 
           <AccordionSection
-            title="Add an item"
+            title="Custom Item"
             isOpen={openSection === 'add-item'}
             onToggle={() => toggleSection('add-item')}
           >
@@ -775,7 +775,7 @@ export function ShoppingListDetailView({
           </AccordionSection>
 
           <AccordionSection
-            title="Add from grocery items"
+            title="Groceries"
             isOpen={openSection === 'catalog'}
             onToggle={() => toggleSection('catalog')}
           >
