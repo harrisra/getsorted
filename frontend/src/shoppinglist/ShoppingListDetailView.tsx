@@ -21,7 +21,7 @@ import {
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { PencilIcon } from '../icons'
 import { addDays, formatDateISO, formatDayHeading } from '../mealplanner/dates'
-import { StoreLogo } from '../StoreLogo'
+import { StoreLogo, hasStoreLogo } from '../StoreLogo'
 
 // Cheapest first — priced options before unpriced ones, since there's
 // nothing to compare an unpriced one on.
@@ -658,10 +658,19 @@ export function ShoppingListDetailView({
                       )}
                     </div>
                   </div>
-                  {/* Store column, between the item name and the Add button. */}
-                  <span className="flex w-24 shrink-0 items-center gap-1 truncate text-xs text-slate-500">
-                    <StoreLogo name={option.storeName} className="h-3 w-auto shrink-0" />
-                    {option.storeName}
+                  {/* Store column, between the item name and the Add button —
+                      just the logo when we have one, since it identifies the
+                      store on its own; falls back to the name as text for a
+                      store with no logo on file. */}
+                  <span
+                    className="flex w-24 shrink-0 items-center gap-1 truncate text-xs text-slate-500"
+                    title={option.storeName}
+                  >
+                    {hasStoreLogo(option.storeName) ? (
+                      <StoreLogo name={option.storeName} className="h-4 w-auto" />
+                    ) : (
+                      option.storeName
+                    )}
                   </span>
                   <button
                     type="button"
@@ -749,15 +758,16 @@ export function ShoppingListDetailView({
 
           {visibleItems !== null && visibleItems.length > 0 && stores.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-slate-700">Visiting:</span>
               {stores.map((store) => {
                 const visiting = !list.excluded_stores.includes(store.id)
+                const logoAvailable = hasStoreLogo(store.name)
                 return (
                   <button
                     key={store.id}
                     type="button"
                     onClick={() => handleToggleStore(store.id)}
                     aria-pressed={visiting}
+                    aria-label={logoAvailable ? store.name : undefined}
                     title={
                       visiting
                         ? `Not going to ${store.name}? Click to move its items elsewhere.`
@@ -769,8 +779,11 @@ export function ShoppingListDetailView({
                         : 'border-slate-300 text-slate-700 hover:bg-slate-100'
                     }`}
                   >
-                    <StoreLogo name={store.name} className="h-4 w-auto shrink-0" />
-                    {store.name}
+                    {logoAvailable ? (
+                      <StoreLogo name={store.name} className="h-4 w-auto" />
+                    ) : (
+                      store.name
+                    )}
                   </button>
                 )
               })}
