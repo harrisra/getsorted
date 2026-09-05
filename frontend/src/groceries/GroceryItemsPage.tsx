@@ -16,7 +16,6 @@ import {
 } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
-import { StoreLogo, hasStoreLogo } from '../StoreLogo'
 import { GroceryItemEditView } from './GroceryItemEditView'
 import { GroceryItemForm } from './GroceryItemForm'
 import { downloadGroceryItemsAsJson, parseImportFiles } from './groceryItemExport'
@@ -497,16 +496,15 @@ export function GroceryItemsPage() {
                   <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
                     {item.store_prices.map((sp) => (
                       <li key={sp.id} className="flex items-center gap-1">
-                        {hasStoreLogo(sp.store_detail.name) ? (
-                          <span title={sp.store_detail.name}>
-                            <StoreLogo name={sp.store_detail.name} className="h-3.5 w-auto shrink-0" />
-                          </span>
-                        ) : (
-                          <span className="font-medium text-slate-600">{sp.store_detail.name}</span>
-                        )}
+                        <span className="font-medium text-slate-600">{sp.store_detail.name}</span>
                         {sp.price && ` £${sp.price}`}
                         {sp.promo_price && (
-                          <span className="font-medium text-amber-600"> (promo £{sp.promo_price})</span>
+                          <span
+                            title="Currently a promo/loyalty-card price"
+                            className="rounded bg-amber-100 px-1 font-medium text-amber-700"
+                          >
+                            promo £{sp.promo_price}
+                          </span>
                         )}
                         {sp.product_url && (
                           <>
