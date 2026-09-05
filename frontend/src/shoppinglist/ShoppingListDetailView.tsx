@@ -725,56 +725,6 @@ export function ShoppingListDetailView({
           )}
 
           <AccordionSection
-            title="Custom Item"
-            isOpen={openSection === 'add-item'}
-            onToggle={() => toggleSection('add-item')}
-          >
-            <form onSubmit={handleAddItem} className="space-y-2">
-              <input
-                type="text"
-                placeholder="Item name…"
-                value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              />
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="g"
-                  value={newItemGrams}
-                  onChange={(e) => setNewItemGrams(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="pc"
-                  value={newItemPieces}
-                  onChange={(e) => setNewItemPieces(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="ml"
-                  value={newItemMilliliters}
-                  onChange={(e) => setNewItemMilliliters(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={addingItem || !newItemName.trim()}
-                className="w-full rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-              >
-                Add
-              </button>
-            </form>
-            {addError && <p className="text-sm text-red-600">{addError}</p>}
-          </AccordionSection>
-
-          <AccordionSection
             title="Groceries"
             isOpen={openSection === 'catalog'}
             onToggle={() => toggleSection('catalog')}
@@ -858,6 +808,56 @@ export function ShoppingListDetailView({
                 </li>
               ))}
             </ul>
+          </AccordionSection>
+
+          <AccordionSection
+            title="Custom Item"
+            isOpen={openSection === 'add-item'}
+            onToggle={() => toggleSection('add-item')}
+          >
+            <form onSubmit={handleAddItem} className="space-y-2">
+              <input
+                type="text"
+                placeholder="Item name…"
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="g"
+                  value={newItemGrams}
+                  onChange={(e) => setNewItemGrams(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="pc"
+                  value={newItemPieces}
+                  onChange={(e) => setNewItemPieces(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="ml"
+                  value={newItemMilliliters}
+                  onChange={(e) => setNewItemMilliliters(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={addingItem || !newItemName.trim()}
+                className="w-full rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </form>
+            {addError && <p className="text-sm text-red-600">{addError}</p>}
           </AccordionSection>
         </div>
 
