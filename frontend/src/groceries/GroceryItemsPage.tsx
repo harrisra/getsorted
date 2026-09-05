@@ -210,6 +210,12 @@ export function GroceryItemsPage() {
         notes.push(`Not on the known store list: ${created.unmatched_stores.join(', ')}.`)
       }
       setTrolleyMessage({ kind: 'notice', text: notes.join(' ') })
+      // Straight to editing the new item — the whole point of "Add from
+      // Trolley" is a starting point to check over/fill in the gaps
+      // (aisle, trolley_url is already set but grams/pieces/milliliters
+      // aren't always parsed), not a finished item to leave sitting in the
+      // list.
+      setEditingId(created.id)
     } catch (err) {
       setTrolleyMessage({
         kind: 'error',
