@@ -71,19 +71,44 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
-// Background/border classes for the product dropdown: pale green when the
-// selected match is the cheapest priced option available, pale red when a
-// cheaper one exists instead. Neutral (default) when there's nothing to
-// compare — a single match, or no priced matches at all.
+// What this option actually costs right now — its promo price when it has
+// one, else its regular price — same "effective price" concept the backend
+// uses for recipe costing (catalog.GroceryItemPrice.effective_price).
+function effectivePrice(option: GroceryItemStorePriceOption): number | null {
+  const raw = option.promo_price ?? option.price
+  return raw != null ? Number(raw) : null
+}
+
+// Every priced option's effective price, only when there's more than one to
+// compare — a single priced option (or none) has nothing to be cheaper or
+// pricier than, so nothing should be colored either way.
+function cheapestEffectivePrice(matches: GroceryItemStorePriceOption[]): number | null {
+  const priced = matches.map(effectivePrice).filter((price): price is number => price != null)
+  return priced.length >= 2 ? Math.min(...priced) : null
+}
+
+// Background/border classes for the product dropdown itself: pale green
+// when the selected match is the cheapest priced option available, pale red
+// when a cheaper one exists instead. Neutral (default) when there's nothing
+// to compare — a single match, or no priced matches at all.
 function selectPriceClasses(matches: GroceryItemStorePriceOption[], selectedId: string): string {
-  const priced = matches.filter((option) => option.price != null)
-  if (priced.length < 2) return 'border-slate-300'
-  const cheapest = Math.min(...priced.map((option) => Number(option.price)))
+  const cheapest = cheapestEffectivePrice(matches)
+  if (cheapest == null) return 'border-slate-300'
   const selected = matches.find((option) => option.id === selectedId)
-  if (selected?.price == null) return 'border-slate-300'
-  return Number(selected.price) <= cheapest
-    ? 'border-green-300 bg-green-50'
-    : 'border-red-300 bg-red-50'
+  const selectedPrice = selected ? effectivePrice(selected) : null
+  if (selectedPrice == null) return 'border-slate-300'
+  return selectedPrice <= cheapest ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'
+}
+
+// Inline background for one <option> row in that same dropdown — same
+// green/red-or-neutral rule as selectPriceClasses, but per row rather than
+// just for whichever is selected. Tailwind classes don't reliably style
+// <option> elements across browsers, so this is plain CSS via style= instead.
+function optionRowBackground(option: GroceryItemStorePriceOption, cheapest: number | null): string | undefined {
+  if (cheapest == null) return undefined
+  const price = effectivePrice(option)
+  if (price == null) return undefined
+  return price <= cheapest ? '#f0fdf4' /* green-50 */ : '#fef2f2' /* red-50 */
 }
 
 // Cost of buying enough packs of the matched product to cover this row —
@@ -879,13 +904,21 @@ export function ShoppingListDetailView({
                           aria-label={`Choose which product to buy for ${item.name}`}
                           className={`w-full rounded-md border px-2 py-1 text-xs text-slate-700 focus:border-slate-500 focus:outline-none ${selectPriceClasses(matches, effectiveGroceryItemPriceId)}`}
                         >
-                          {matches.map((option) => (
-                            <option key={option.id} value={option.id}>
-                              {option.storeName} — {option.name}
-                              {option.price ? ` — £${option.price}` : ''}
-                              {option.promo_price ? ` (promo £${option.promo_price})` : ''}
-                            </option>
-                          ))}
+                          {(() => {
+                            const cheapest = cheapestEffectivePrice(matches)
+                            return matches.map((option) => (
+                              <option
+                                key={option.id}
+                                value={option.id}
+                                style={{ backgroundColor: optionRowBackground(option, cheapest) }}
+                              >
+                                {option.promo_price ? '⭐ ' : ''}
+                                {option.storeName} — {option.name}
+                                {option.price ? ` — £${option.price}` : ''}
+                                {option.promo_price ? ` (promo £${option.promo_price})` : ''}
+                              </option>
+                            ))
+                          })()}
                         </select>
                       )}
                     </div>
