@@ -21,24 +21,26 @@ import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { PencilIcon } from '../icons'
 import { addDays, formatDateISO, formatDayHeading } from '../mealplanner/dates'
 
-// Catalog (item, store) prices whose name mentions this shopping-list
-// item's name (e.g. "Cheddar" matches "Tesco Mature Cheddar Block 400g"),
-// cheapest first — priced options before unpriced ones, since there's
+// Cheapest first — priced options before unpriced ones, since there's
 // nothing to compare an unpriced one on.
+function sortByPrice(options: GroceryItemStorePriceOption[]): GroceryItemStorePriceOption[] {
+  return [...options].sort((a, b) => {
+    if (a.price == null && b.price == null) return 0
+    if (a.price == null) return 1
+    if (b.price == null) return -1
+    return Number(a.price) - Number(b.price)
+  })
+}
+
+// Catalog (item, store) prices whose name mentions this shopping-list
+// item's name (e.g. "Cheddar" matches "Tesco Mature Cheddar Block 400g").
 function matchingGroceryItemOptions(
   itemName: string,
   options: GroceryItemStorePriceOption[],
 ): GroceryItemStorePriceOption[] {
   const needle = itemName.trim().toLowerCase()
   if (!needle) return []
-  return options
-    .filter((option) => option.name.toLowerCase().includes(needle))
-    .sort((a, b) => {
-      if (a.price == null && b.price == null) return 0
-      if (a.price == null) return 1
-      if (b.price == null) return -1
-      return Number(a.price) - Number(b.price)
-    })
+  return sortByPrice(options.filter((option) => option.name.toLowerCase().includes(needle)))
 }
 
 // The raw amount needed, e.g. "500g" or "2pc + 300ml" — used as a fallback
@@ -125,21 +127,27 @@ function enrichItems(
 ): EnrichedItem[] {
   return items.map((item) => {
     const nameMatches = matchingGroceryItemOptions(item.name, groceryItemOptions)
-    // The item's actually-assigned match (e.g. set by "Generate", which
-    // matches via the real recipe-ingredient -> grocery-item link, not a
-    // name search) always counts as a match even when this name search
-    // wouldn't have found it itself — the ingredient's name and the
-    // matched product's own name don't always literally overlap (e.g.
-    // "Tilda Microwave Rice Pilau Basmati" vs. "Microwave Pilau Basmati
-    // Rice Steamed Classic"), and that shouldn't make an already-matched
-    // item look unmatched.
+    // Every store price of the item's actually-assigned product counts as
+    // a switchable match too, even when a name search wouldn't have found
+    // any of them itself — the ingredient's name and the matched product's
+    // own name don't always literally overlap (e.g. "Tilda Microwave Rice
+    // Pilau Basmati" vs. "Microwave Pilau Basmati Rice Steamed Classic"),
+    // and that shouldn't make an already-matched item look unmatched, nor
+    // hide its other stores (the assigned match is set by "Generate" via
+    // the real recipe-ingredient -> grocery-item link, not this search —
+    // picking the cheapest store at the time, but every other store
+    // selling that exact product should still be pickable here).
     const assigned = item.grocery_item_price
       ? groceryItemOptions.find((option) => option.id === item.grocery_item_price)
       : undefined
-    const matches =
-      assigned && !nameMatches.some((option) => option.id === assigned.id)
-        ? [assigned, ...nameMatches]
-        : nameMatches
+    const assignedProductOptions = assigned
+      ? groceryItemOptions.filter((option) => option.groceryItemId === assigned.groceryItemId)
+      : []
+    const matches = sortByPrice(
+      [...assignedProductOptions, ...nameMatches].filter(
+        (option, index, all) => all.findIndex((o) => o.id === option.id) === index,
+      ),
+    )
     const effective = matches.find((option) => option.id === item.grocery_item_price) ?? matches[0]
     return {
       item,
