@@ -906,7 +906,7 @@ export function ShoppingListDetailView({
             row's intrinsic content width (several fixed-width, non-
             wrapping controls), which was forcing a horizontal scrollbar
             instead of the row content reflowing to fit. */}
-        <div className="min-w-0 w-full flex-1 space-y-4 pb-4 pr-4 pt-4 sm:pb-8 sm:pr-8 sm:pt-8 lg:h-full lg:overflow-y-auto">
+        <div className="flex min-w-0 w-full flex-1 flex-col space-y-4 pb-4 pr-4 pt-4 sm:pb-8 sm:pr-8 sm:pt-8 lg:h-full">
           {editingName ? (
             <form
               onSubmit={handleRename}
@@ -1040,7 +1040,11 @@ export function ShoppingListDetailView({
             </div>
           )}
 
-          <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
+          {/* The only part of this panel that scrolls — title, store
+              selection, sort row, and totals below all stay shrink-0 (their
+              natural height) so they're always visible regardless of how
+              long the list itself is. */}
+          <ul className="min-h-0 flex-1 divide-y divide-slate-200 overflow-y-auto rounded-lg border border-slate-200 bg-white">
             {(() => {
           let lastHeading: string | null | undefined
           return sortedItems?.map(({ item, matches, effectiveGroceryItemPriceId, effectiveStore, effectiveAisleLabel }) => {
