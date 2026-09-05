@@ -18,6 +18,7 @@ interface StoreCostPreview {
   store: string
   storeName: string
   lineCost: number | null
+  isPromo: boolean
 }
 
 // Mirrors the backend's RecipeIngredientGroceryItemSerializer.get_store_costs
@@ -43,6 +44,7 @@ function storeCostPreviews(item: GroceryItem, ingredient: IngredientQuantity): S
       storeName: sp.store_detail.name,
       lineCost:
         ratio != null && effectivePrice != null ? Math.round(Number(effectivePrice) * ratio * 100) / 100 : null,
+      isPromo: sp.promo_price != null,
     }
   })
 }
@@ -418,7 +420,11 @@ export function RecipeForm({
                         <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-500">
                           {costs.length === 0 && <li>No store prices yet</li>}
                           {costs.map((cost) => (
-                            <li key={cost.store}>
+                            <li
+                              key={cost.store}
+                              title={cost.isPromo ? 'Currently a promo/loyalty-card price' : undefined}
+                              className={cost.isPromo ? 'rounded bg-amber-100 px-1' : undefined}
+                            >
                               {cost.storeName}: {cost.lineCost != null ? `£${cost.lineCost.toFixed(2)}` : '—'}
                             </li>
                           ))}
