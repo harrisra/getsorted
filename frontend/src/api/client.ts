@@ -484,6 +484,11 @@ export interface GroceryMatchStoreCost {
   store_name: string
   price: string | null
   line_cost: string | null
+  // This store's current promotional/loyalty-card price, if it has one
+  // right now — reported for callers that want to flag "this ingredient
+  // has a current promo" (e.g. highlighting a recipe), not used in
+  // line_cost/cost calculations, which stay on the regular price only.
+  promo_price: string | null
 }
 
 export interface RecipeIngredientGroceryItem {
