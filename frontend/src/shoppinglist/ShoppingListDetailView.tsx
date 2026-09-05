@@ -687,8 +687,13 @@ export function ShoppingListDetailView({
         </div>
 
         {/* Right panel: the list itself, filling whatever width is left
-            next to the left panel. */}
-        <div className="w-full space-y-4">
+            next to the left panel. min-w-0 overrides the grid item's default
+            min-width: auto — without it, this column refuses to shrink
+            below the item row's intrinsic content width (several
+            fixed-width, non-wrapping controls), which was forcing the whole
+            page to grow a horizontal scrollbar instead of the row content
+            reflowing to fit. */}
+        <div className="min-w-0 w-full space-y-4">
           {editingName ? (
             <form
               onSubmit={handleRename}
@@ -841,8 +846,8 @@ export function ShoppingListDetailView({
                     {heading}
                   </li>
                 )}
-                <li className="flex items-center justify-between gap-3 px-4 py-3">
-                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
+                  <label className="flex min-w-0 flex-1 basis-40 cursor-pointer items-center gap-3">
                     <input
                       type="checkbox"
                       checked={item.is_checked}
@@ -857,7 +862,7 @@ export function ShoppingListDetailView({
                       {item.name}
                     </span>
                   </label>
-                  <div className="flex shrink-0 items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     {/* Raw amount needed, to the left of the product
                         dropdown. Fixed-width and always rendered (even
                         empty) so this column lines up between rows
@@ -866,7 +871,7 @@ export function ShoppingListDetailView({
                     <span className="w-20 shrink-0 text-xs text-slate-500">
                       {formatAmount(item) ?? ''}
                     </span>
-                    <div className="w-64 shrink-0">
+                    <div className="w-64 max-w-full shrink-0">
                       {matches.length > 0 && (
                         <select
                           value={effectiveGroceryItemPriceId}
