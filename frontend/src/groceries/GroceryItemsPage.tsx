@@ -497,14 +497,15 @@ export function GroceryItemsPage() {
                     {item.store_prices.map((sp) => (
                       <li key={sp.id} className="flex items-center gap-1">
                         <span className="font-medium text-slate-600">{sp.store_detail.name}</span>
-                        {sp.price && ` £${sp.price}`}
-                        {sp.promo_price && (
+                        {sp.promo_price ? (
                           <span
                             title="Currently a promo/loyalty-card price"
                             className="rounded bg-amber-100 px-1 font-medium text-amber-700"
                           >
-                            promo £{sp.promo_price}
+                            £{sp.promo_price}
                           </span>
+                        ) : (
+                          sp.price && ` £${sp.price}`
                         )}
                         {sp.product_url && (
                           <>
