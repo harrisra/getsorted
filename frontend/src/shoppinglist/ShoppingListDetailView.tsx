@@ -775,14 +775,17 @@ export function ShoppingListDetailView({
                     }
                     className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition ${
                       visiting
-                        ? 'border-slate-800 bg-slate-800 text-white'
-                        : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                        ? 'border-slate-300 hover:bg-slate-100'
+                        : 'border-slate-200 hover:bg-slate-50'
                     }`}
                   >
                     {logoAvailable ? (
-                      <StoreLogo name={store.name} className="h-4 w-auto" />
+                      <StoreLogo
+                        name={store.name}
+                        className={`h-4 w-auto transition ${visiting ? '' : 'opacity-40 grayscale'}`}
+                      />
                     ) : (
-                      store.name
+                      <span className={visiting ? 'text-slate-700' : 'text-slate-400'}>{store.name}</span>
                     )}
                   </button>
                 )
