@@ -195,7 +195,14 @@ export function ItemGroceryMatchesEditor<T extends QuantifiedItem>({
       </div>
       <div className="space-y-2">
         {items.map((row, index) => (
-          <div key={index} className="space-y-2 rounded-md border border-slate-100 p-2">
+          <div
+            key={index}
+            className="grid grid-cols-1 gap-3 rounded-md border border-slate-100 p-2 lg:grid-cols-2"
+          >
+            {/* Left: this row's own details. Right: what it's matched to —
+                split into two columns (rather than the matches stacked
+                below, indented) so a row's details and its matches line up
+                side by side instead of one on top of the other. */}
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="text"
@@ -247,7 +254,7 @@ export function ItemGroceryMatchesEditor<T extends QuantifiedItem>({
               </button>
             </div>
 
-            <div className="space-y-1 pl-4">
+            <div className="space-y-1 lg:border-l lg:border-slate-100 lg:pl-4">
               <span className="text-xs font-medium text-slate-500">Grocery matches</span>
               {row.grocery_matches.map((match) => {
                 const item = groceryItems.find((gi) => gi.id === match.grocery_item)
