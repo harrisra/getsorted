@@ -951,7 +951,7 @@ export function ShoppingListDetailView({
                       className="h-4 w-4 shrink-0 rounded border-slate-300"
                     />
                     <span
-                      className={`min-w-0 truncate text-sm ${
+                      className={`min-w-0 break-words text-sm ${
                         item.is_checked ? 'text-slate-400 line-through' : 'text-slate-800'
                       }`}
                     >
