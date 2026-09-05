@@ -286,7 +286,9 @@ export function GroceryItemForm({
                 />
                 <input
                   type="text"
-                  title="Promo/loyalty-card price, if there's one on right now"
+                  name="promoPrice"
+                  autoComplete="off"
+                  title="Discounted price, if this item is currently on a special offer"
                   placeholder="Promo price"
                   value={sp.promo_price ?? ''}
                   onChange={(e) => updateStorePrice(sp.store, { promo_price: e.target.value })}
