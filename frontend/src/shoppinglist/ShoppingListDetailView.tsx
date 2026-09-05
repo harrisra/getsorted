@@ -124,7 +124,22 @@ function enrichItems(
   groceryItemOptions: GroceryItemStorePriceOption[],
 ): EnrichedItem[] {
   return items.map((item) => {
-    const matches = matchingGroceryItemOptions(item.name, groceryItemOptions)
+    const nameMatches = matchingGroceryItemOptions(item.name, groceryItemOptions)
+    // The item's actually-assigned match (e.g. set by "Generate", which
+    // matches via the real recipe-ingredient -> grocery-item link, not a
+    // name search) always counts as a match even when this name search
+    // wouldn't have found it itself — the ingredient's name and the
+    // matched product's own name don't always literally overlap (e.g.
+    // "Tilda Microwave Rice Pilau Basmati" vs. "Microwave Pilau Basmati
+    // Rice Steamed Classic"), and that shouldn't make an already-matched
+    // item look unmatched.
+    const assigned = item.grocery_item_price
+      ? groceryItemOptions.find((option) => option.id === item.grocery_item_price)
+      : undefined
+    const matches =
+      assigned && !nameMatches.some((option) => option.id === assigned.id)
+        ? [assigned, ...nameMatches]
+        : nameMatches
     const effective = matches.find((option) => option.id === item.grocery_item_price) ?? matches[0]
     return {
       item,
