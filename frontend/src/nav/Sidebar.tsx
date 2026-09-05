@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { GIT_SHA } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { useHouseholds } from '../households/HouseholdsContext'
 import {
@@ -72,6 +73,14 @@ export function Sidebar({
     >
       <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-4">
         <span className="text-lg font-semibold text-slate-800">{collapsed ? 'GS' : 'GetSorted'}</span>
+        {!collapsed && GIT_SHA && (
+          <span
+            className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-400"
+            title={`Build ${GIT_SHA}`}
+          >
+            {GIT_SHA}
+          </span>
+        )}
       </div>
 
       {currentHousehold && !collapsed && (

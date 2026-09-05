@@ -1,5 +1,11 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
+// Short git commit SHA this build was made from — baked in at Docker build
+// time per deployment target (see .github/workflows/ci.yml), so it's obvious
+// which build is running where. null in local dev unless set explicitly (see
+// docker-compose.yml).
+export const GIT_SHA: string | null = import.meta.env.VITE_GIT_SHA || null
+
 export interface CurrentUser {
   pk: string
   email: string

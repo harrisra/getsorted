@@ -44,6 +44,10 @@ services:
       # Same underlying client as the backend's GOOGLE_OAUTH_CLIENT_ID above —
       # this half is public (baked into the bundle), so it's fine client-side.
       VITE_GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      # Only set if you export VITE_GIT_SHA yourself before `docker compose
+      # up` — CI sets this for real deployments (see .github/workflows/ci.yml);
+      # local dev just shows no build badge without it.
+      VITE_GIT_SHA: ${VITE_GIT_SHA:-}
     depends_on:
       - backend
 
