@@ -76,7 +76,11 @@ function toStorePriceInput(
   stores: Store[],
 ): GroceryItemInput['store_prices'][number] | null {
   if (!isPlainRecord(entry) || typeof entry.store !== 'string') return null
-  const store = stores.find((s) => s.name.toLowerCase() === entry.store.trim().toLowerCase())
+  // A property access narrowed by the guard above doesn't stay narrowed once
+  // read inside a closure (the .find() callback below) — pull it into its
+  // own narrowed local first.
+  const entryStoreName = entry.store
+  const store = stores.find((s) => s.name.toLowerCase() === entryStoreName.trim().toLowerCase())
   if (!store) return null
   return {
     store: store.id,
