@@ -248,6 +248,11 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
             "recipes__ingredients__grocery_matches__grocery_item__store_prices__store",
         )
 
+        # Stores this list isn't buying from — a generated item should never
+        # default to one of these, same as reoptimize_item_stores respects
+        # this set for an already-generated item whose stores change later.
+        excluded_store_ids = set(shopping_list.excluded_stores.values_list("id", flat=True))
+
         # Normalized ingredient name -> [(ingredient, meal_plan_id), ...]
         groups = {}
         for slot in slots:
@@ -275,11 +280,14 @@ class ShoppingListViewSet(HouseholdScopedViewSet):
             # item shows a cost straight away instead of only after the user
             # re-picks a product from the dropdown. Only ever set on create;
             # merging into an existing item never touches its match (see
-            # add_or_merge_shopping_list_item).
+            # add_or_merge_shopping_list_item). Stores this list has excluded
+            # are never picked here, even if cheaper — same rule
+            # reoptimize_item_stores already applies for an existing item.
             priced_options = [
                 (price_row, cost)
                 for ingredient, _ in entries
                 for price_row, cost in ingredient.store_costs
+                if price_row.store_id not in excluded_store_ids
             ]
             grocery_item_price = (
                 min(priced_options, key=lambda pair: pair[1])[0] if priced_options else None
