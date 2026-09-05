@@ -16,7 +16,7 @@ import {
 import { useAuth } from '../auth/AuthContext'
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { PencilIcon } from '../icons'
-import { StoreLogo } from '../StoreLogo'
+import { StoreLogo, hasStoreLogo } from '../StoreLogo'
 import { GroceryItemEditView } from './GroceryItemEditView'
 import { GroceryItemForm } from './GroceryItemForm'
 import { downloadGroceryItemsAsJson, parseImportFiles } from './groceryItemExport'
@@ -448,8 +448,13 @@ export function GroceryItemsPage() {
                   <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
                     {item.store_prices.map((sp) => (
                       <li key={sp.id} className="flex items-center gap-1">
-                        <StoreLogo name={sp.store_detail.name} className="h-3 w-auto shrink-0" />
-                        <span className="font-medium text-slate-600">{sp.store_detail.name}</span>
+                        {hasStoreLogo(sp.store_detail.name) ? (
+                          <span title={sp.store_detail.name}>
+                            <StoreLogo name={sp.store_detail.name} className="h-3.5 w-auto shrink-0" />
+                          </span>
+                        ) : (
+                          <span className="font-medium text-slate-600">{sp.store_detail.name}</span>
+                        )}
                         {sp.price && ` £${sp.price}`}
                         {sp.promo_price && (
                           <span className="font-medium text-amber-600"> (promo £{sp.promo_price})</span>
