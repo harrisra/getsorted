@@ -15,9 +15,10 @@ More sub-apps are expected to follow, sharing the same accounts/auth/household s
 - **Prod Postgres:** in-cluster, managed by a Postgres operator (e.g. CloudNativePG)
 - **K8s manifests:** Helm chart(s), synced by ArgoCD
 
-> The frontend stack, decoupled architecture, Docker dev setup, in-cluster Postgres
-> operator, and Helm as the manifest format are my recommended defaults, not yet
-> confirmed by Rob — flag/revisit if reality diverges.
+> The frontend stack, decoupled architecture, in-cluster Postgres operator, and
+> Helm as the manifest format are my recommended defaults, not yet confirmed by
+> Rob — flag/revisit if reality diverges. The Docker dev setup below is now
+> confirmed: Rob runs it day-to-day via Docker Desktop on Windows.
 
 ## Architecture
 
@@ -31,6 +32,8 @@ backend/             Django project
   config/              settings, urls, wsgi/asgi
   accounts/            User (email-based), Household, Membership, Google OAuth login view
   mealplanner/         first sub-app: recipes, weekly plan, shopping list
+  catalog/             shared grocery product catalog (Store, GroceryItem) — app-wide,
+                       not Household-scoped; see Catalog below
 frontend/            React SPA (Vite + TypeScript + Tailwind v4)
 docker-compose.yml   postgres + backend + frontend for local dev
 deploy/              Helm chart(s) for k3s, synced by ArgoCD (not yet created)
@@ -71,9 +74,40 @@ same pattern as `mealplanner`.
 - Shopping list auto-generated from the week's planned meals
 - Fully multiuser: any household member can view/edit the plan and list
 
+#### Catalog
+
+A shared, app-wide product catalog (`Store`, `GroceryItem`) feeding the meal
+planner's shopping list — e.g. so a "Tesco British Cooked Ham Slices 120g" entry is
+added once and reused by every household, rather than each household maintaining
+its own copy. Deliberately **not** Household-scoped, the one exception to the
+sub-app convention above; any signed-in user can view/add/edit entries, but only
+the account that created an entry (`created_by`) can delete it.
+
+It also fetches product data from external sources on the user's behalf, all under
+`/api/catalog/grocery-items/`:
+
+- `refresh-price` — re-fetches an item's price from its `trolley_url` (a
+  trolley.co.uk product page) by scraping that page's own per-store comparison
+  table, and open to any signed-in user (no third-party API cost, no bot-block
+  risk — see `_scrape_trolley_price` in `catalog/views.py`).
+- `populate` / `scrape` — look up store/name/size/price from a pasted product URL
+  via the paid Pepesto API (`PEPESTO_API_KEY`), or via Sainsbury's own product
+  search for sainsburys.co.uk URLs specifically. Restricted to
+  `rob.harris@harristribe.co.uk` only (`SCRAPE_ALLOWED_EMAIL` in
+  `catalog/views.py`), since these call paid/rate-limited third-party services on
+  the caller's behalf.
+
 ## Conventions
 
 ### Running locally
+
+Rob develops on Windows 11, using PowerShell as the primary shell, with Docker
+Desktop (WSL2 backend) as the actual day-to-day dev environment — Node and Python
+aren't installed natively; everything runs in containers. In practice the three
+containers (`getsorted-db-1`, `getsorted-backend-1`, `getsorted-frontend-1`) are
+usually already up and left running across sessions rather than restarted each time
+— check `docker compose ps` / `docker ps` before assuming a fresh `up --build` is
+needed.
 
 ```
 docker compose up --build
@@ -90,24 +124,27 @@ docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py createsuperuser
 ```
 
-Google OAuth login won't work until real credentials are set — copy `.env.example`
-to `.env` at the repo root and fill in `GOOGLE_OAUTH_CLIENT_ID` /
-`GOOGLE_OAUTH_CLIENT_SECRET` (from a Google Cloud OAuth client). Without them,
-everything else (admin, email/password auth, meal planner API) still works.
+`.env` at the repo root (copied from `.env.example`, gitignored) holds secrets read
+by `docker-compose.yml`:
+
+- `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` — Google login. Without
+  them, everything else (admin, email/password auth, meal planner API) still works.
+- `PEPESTO_API_KEY` — used by the `catalog` app's price-fetching (e.g. the
+  trolley.co.uk integration); leave blank to develop without live price lookups.
+
+Editing either Dockerfile's `dev` stage, `docker-compose.yml` itself, or
+`requirements.txt`/`package.json` needs `docker compose up --build` (or
+`docker compose up -d --build <service>`) to take effect — plain source edits under
+`backend/`/`frontend/` are picked up live via the bind mounts (Django autoreload,
+Vite HMR).
 
 ### Without Docker
 
-Node and Docker were not available in the environment this skeleton was built in,
-so the frontend has not been `npm install`ed or run yet — do that first:
-
-```
-cd frontend && npm install && npm run dev
-```
-
-The backend was verified directly with the `py` launcher (venv + `pip install -r
-requirements.txt` + `manage.py migrate`/`runserver`), reusing the same `DATABASE_URL`
-override trick (e.g. `sqlite:///db.sqlite3`) if you don't want Postgres running
-locally outside Docker.
+Only needed to iterate on one side without the other containers, or if Docker isn't
+available. See `docs/setup.md` for the full "Running without Docker" instructions
+(backend: venv + `pip install -r requirements.txt`, with `DATABASE_URL` overridable
+to e.g. `sqlite:///db.sqlite3`; frontend: `npm install && npm run dev`, already done
+in this repo's `frontend/` checkout).
 
 ### API auth model
 
@@ -124,4 +161,6 @@ admin/testing convenience — Google is the primary intended login method.
 Follow the `mealplanner` app as the template: models scoped to `Household` (FK or via
 the household of a parent object), a `HouseholdScopedViewSet`-style base that filters
 querysets to the requesting user's households, and a router wired into
-`config/urls.py` under `/api/<subapp>/`.
+`config/urls.py` under `/api/<subapp>/`. `catalog` is the one deliberate exception
+(app-wide data, not Household-scoped) — a new sub-app should default to
+Household-scoping unless it has the same "shared across every household" rationale.
