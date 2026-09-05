@@ -771,8 +771,10 @@ export function ShoppingListDetailView({
             // edges — and the list is flex-1 (see below) rather than
             // capped at max-h-72, so it uses whatever vertical space this
             // section has instead of stopping short and leaving blank
-            // space underneath.
-            contentClassName="space-y-2"
+            // space underneath. No gap between them either (nor rounded
+            // corners on either — see their own classNames), so they read
+            // as one continuous block rather than two separate boxes.
+            contentClassName=""
           >
             <input
               type="search"
@@ -780,11 +782,11 @@ export function ShoppingListDetailView({
               value={catalogSearch}
               onChange={(e) => setCatalogSearch(e.target.value)}
               aria-label="Search grocery items to add"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              className="w-full border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
             />
             {catalogAddError && <p className="text-sm text-red-600">{catalogAddError}</p>}
 
-            <ul className="min-h-0 flex-1 divide-y divide-slate-200 overflow-y-auto rounded-md border border-slate-200">
+            <ul className="min-h-0 flex-1 divide-y divide-slate-200 overflow-y-auto border border-slate-200">
               {catalogResults.length === 0 && (
                 <li className="px-3 py-3 text-sm text-slate-400">
                   {trimmedCatalogSearch ? 'No grocery items match.' : 'Search for a grocery item to add it.'}
