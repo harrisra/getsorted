@@ -227,7 +227,12 @@ export function ItemGroceryMatchesEditor<T extends QuantifiedItem>({
                 row's own details, then what it's matched to — split into
                 separate columns (rather than the matches stacked below,
                 indented) so a row's photo, details, and matches all line up
-                side by side instead of one on top of the other. */}
+                side by side instead of one on top of the other. min-w-0 on
+                the two 1fr columns below — each row is its own independent
+                grid, so without it a column's long content (e.g. a long
+                product name) grows that row's track past an even 50/50
+                split, landing the details/matches boundary at a different
+                width on every row instead of lined up down the page. */}
             <div className="flex items-center justify-center lg:justify-start">
               {cheapestImage && (
                 <img
@@ -237,7 +242,7 @@ export function ItemGroceryMatchesEditor<T extends QuantifiedItem>({
                 />
               )}
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex min-w-0 flex-col gap-2">
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -292,7 +297,7 @@ export function ItemGroceryMatchesEditor<T extends QuantifiedItem>({
               </div>
             </div>
 
-            <div className="space-y-1 lg:border-l lg:border-slate-100 lg:pl-4">
+            <div className="min-w-0 space-y-1 lg:border-l lg:border-slate-100 lg:pl-4">
               <span className="text-xs font-medium text-slate-500">Grocery matches</span>
               {row.grocery_matches.map((match) => {
                 const item = groceryItems.find((gi) => gi.id === match.grocery_item)
