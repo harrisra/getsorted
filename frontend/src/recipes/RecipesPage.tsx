@@ -14,7 +14,6 @@ import {
 import { useAuth } from '../auth/AuthContext'
 import { ConfirmDeleteButton } from '../ConfirmDeleteButton'
 import { useHouseholds } from '../households/HouseholdsContext'
-import { PencilIcon } from '../icons'
 import { RecipeEditView } from './RecipeEditView'
 import { RecipeForm } from './RecipeForm'
 import { downloadRecipesAsJson, parseImportFiles } from './recipeExport'
@@ -316,12 +315,13 @@ export function RecipesPage() {
         {filteredRecipes?.map((recipe) => (
           <li
             key={recipe.id}
+            onClick={() => setEditingId(recipe.id)}
             title={
               recipe.has_promo_price
                 ? 'One or more ingredients are matched to a product currently on a promo/loyalty-card price'
-                : undefined
+                : 'Click to edit'
             }
-            className={`px-4 py-3 ${recipe.has_promo_price ? 'bg-amber-50' : ''}`}
+            className={`cursor-pointer px-4 py-3 hover:bg-slate-50 ${recipe.has_promo_price ? 'bg-amber-50' : ''}`}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-3">
@@ -329,6 +329,7 @@ export function RecipesPage() {
                   type="checkbox"
                   checked={selectedIds.has(recipe.id)}
                   onChange={() => toggleSelected(recipe.id)}
+                  onClick={(e) => e.stopPropagation()}
                   aria-label={`Select ${recipe.name}`}
                   className="h-4 w-4 shrink-0 rounded border-slate-300"
                 />
@@ -350,6 +351,7 @@ export function RecipesPage() {
                           href={recipe.source_url}
                           target="_blank"
                           rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
                           className="text-blue-600 hover:underline"
                         >
                           Recipe link
@@ -359,14 +361,14 @@ export function RecipesPage() {
                   </p>
                 </div>
               </div>
-              {/* Cost column + edit/delete buttons grouped together so
+              {/* Cost column + delete button grouped together so
                   "justify-between" on the row only splits it into two
                   parts (info on the left, this group flush right) — with
                   three separate flex children it would spread the cost
                   column out to sit between them instead. */}
               <div className="flex shrink-0 items-center gap-4">
                 {/* Total cost column, right-aligned in a large font,
-                    immediately before the edit/delete buttons. */}
+                    immediately before the delete button. */}
                 <div className="w-28 shrink-0 text-right">
                   {recipe.current_cost && (
                     <>
@@ -379,23 +381,16 @@ export function RecipesPage() {
                     </>
                   )}
                 </div>
-                <div className="flex shrink-0 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(recipe.id)}
-                    title="Edit"
-                    aria-label="Edit"
-                    className="text-slate-500 hover:text-slate-900"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-                  {canDelete(recipe) && (
+                {/* stopPropagation — deleting shouldn't also open the edit
+                    view the row's own click already opens. */}
+                {canDelete(recipe) && (
+                  <div onClick={(e) => e.stopPropagation()} className="flex shrink-0 gap-3">
                     <ConfirmDeleteButton
                       label="Remove recipe"
                       onConfirm={() => handleDelete(recipe.id)}
                     />
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </li>
